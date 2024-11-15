@@ -761,6 +761,15 @@ class Localization:
                 'ja-JP' : '元の画像に戻す',
                 'de-DE' : 'Referenzpose zurücksetzen'},
     
+    'QLivePortraitAnimator.module_title':{
+                'en-US' : 'LivePortrait animator',
+                'ru-RU' : 'Аниматор LivePortrait',
+                'zh-CN' : 'LivePortrait驱动器',
+                'es-ES' : 'Animador de LivePortrait',
+                'it-IT' : 'Animatrice LivePortrait',
+                'ja-JP' : 'LivePortraitアニメーター',
+                'de-DE' : 'Animatrice LivePortrait'},
+    
     'QFaceSwapInsight.module_title':{
                 'en-US' : 'Face swap (Insight)',
                 'ru-RU' : 'Замена лица (Insight)',

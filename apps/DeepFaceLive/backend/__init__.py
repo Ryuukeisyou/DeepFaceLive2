@@ -4,6 +4,7 @@ from .BackendBase import (BackendConnection, BackendConnectionData, BackendDB,
 from .CameraSource import CameraSource
 from .FaceAligner import FaceAligner
 from .FaceAnimator import FaceAnimator
+from .LivePortraitAnimator import LivePortraitAnimator
 from .FaceDetector import FaceDetector
 from .FaceMarker import FaceMarker
 from .FaceMerger import FaceMerger
