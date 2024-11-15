@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 
 class AAxes(Iterable):
     __slots__ = ['axes','ndim','_inversed']

@@ -18,9 +18,9 @@ class _NumberBase:
 
     def _set_number(self, number, block_event=False):
         if number is not None:
-            if isinstance(number, (int, np.int, np.int8, np.int16, np.int32, np.int64)):
+            if isinstance(number, (int, int, np.int8, np.int16, np.int32, np.int64)):
                 number = int(number)
-            elif isinstance(number, (float, np.float, np.float16, np.float32, np.float64)):
+            elif isinstance(number, (float, float, np.float16, np.float32, np.float64)):
                 number = float(number)
             else:
                 raise ValueError('number must be an instance of int/float')

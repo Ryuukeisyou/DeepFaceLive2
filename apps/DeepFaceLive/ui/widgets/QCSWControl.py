@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 
 from xlib import qt as qtx
 from xlib.mp import csw as lib_csw

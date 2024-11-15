@@ -1,5 +1,5 @@
 import operator
-from collections import Iterable
+from collections.abc import Iterable
 from typing import List, Tuple
 
 import cv2

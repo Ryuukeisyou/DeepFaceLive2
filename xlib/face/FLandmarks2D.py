@@ -1258,7 +1258,7 @@ uni_landmarks_468 = np.array(
 # pts /= pts.max(axis=0)
 
 # pts *= [res, res]
-# pts = pts.astype(np.int)
+# pts = pts.astype(int)
 
 # img = np.zeros( (res,res,3), np.uint8 )
 # wnd_name = 'asd'

@@ -240,6 +240,14 @@ class DeepFaceLiveApp(qtx.QXMainApplication):
 
         self._dfl_wnd = None
         self._t = qtx.QXTimer(interval=1666, timeout=self._on_splash_wnd_expired, single_shot=True, start=True)
+        
+        # set palette
+        palette = self.palette()
+        from PyQt6.QtGui import QPalette, QColor
+        palette.setColor(QPalette.ColorRole.ToolTipText, QColor("black"))
+        palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("light gray"))
+        self.setPalette(palette)
+        
         self.initialize()
 
     def on_reinitialize(self):
