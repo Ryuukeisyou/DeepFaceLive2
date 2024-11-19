@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-from modelhub.onnx import LivePortrait
+from modelhub.torch import LivePortrait
 from xlib import cv as lib_cv2
 from xlib import os as lib_os
 from xlib import path as lib_path
