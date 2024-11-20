@@ -14,6 +14,7 @@ from .ui.QFaceAligner import QFaceAligner
 from .ui.QFaceAnimator import QFaceAnimator
 from .ui.QLivePortraitAnimator import QLivePortraitAnimator
 from .ui.QFaceDetector import QFaceDetector
+from .ui.QFaceCropper import QFaceCropper
 from .ui.QFaceMarker import QFaceMarker
 from .ui.QFaceMerger import QFaceMerger
 from .ui.QFaceSwapInsight import QFaceSwapInsight
@@ -24,6 +25,7 @@ from .ui.QStreamOutput import QStreamOutput
 from .ui.widgets.QBCFaceAlignViewer import QBCFaceAlignViewer
 from .ui.widgets.QBCFaceSwapViewer import QBCFaceSwapViewer
 from .ui.widgets.QBCFrameViewer import QBCFrameViewer
+from .ui.widgets.QBCCropViewer import QBCCropViewer
 from .ui.widgets.QBCMergedFrameViewer import QBCMergedFrameViewer
 
 
@@ -48,52 +50,58 @@ class QLiveSwap(qtx.QXWidget):
 
         multi_sources_bc_out  = backend.BackendConnection(multi_producer=True)
         face_detector_bc_out  = backend.BackendConnection()
+        face_cropper_bc_out   = backend.BackendConnection()
         face_marker_bc_out    = backend.BackendConnection()
         face_aligner_bc_out   = backend.BackendConnection()
         face_swapper_bc_out   = backend.BackendConnection()
         frame_adjuster_bc_out = backend.BackendConnection()
         face_merger_bc_out    = backend.BackendConnection()
 
-        file_source    = self.file_source    = backend.FileSource   (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_out=multi_sources_bc_out, backend_db=backend_db)
-        camera_source  = self.camera_source  = backend.CameraSource (weak_heap=backend_weak_heap, bc_out=multi_sources_bc_out, backend_db=backend_db)
-        face_detector  = self.face_detector  = backend.FaceDetector (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=multi_sources_bc_out, bc_out=face_detector_bc_out, backend_db=backend_db )
-        face_marker    = self.face_marker    = backend.FaceMarker   (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_detector_bc_out, bc_out=face_marker_bc_out, backend_db=backend_db)
-        face_aligner   = self.face_aligner   = backend.FaceAligner  (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_marker_bc_out, bc_out=face_aligner_bc_out, backend_db=backend_db )
-        face_animator  = self.face_animator  = backend.FaceAnimator (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_merger_bc_out, animatables_path=animatables_path, backend_db=backend_db )
-        live_portrait_animator = self.live_portrait_animator = backend.LivePortraitAnimator (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_merger_bc_out, animatables_path=animatables_path, backend_db=backend_db )
-        face_swap_insight  = self.face_swap_insight  = backend.FaceSwapInsight (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_swapper_bc_out, faces_path=animatables_path, backend_db=backend_db )
-        face_swap_dfm   = self.face_swap_dfm   = backend.FaceSwapDFM  (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_swapper_bc_out, dfm_models_path=dfm_models_path, backend_db=backend_db )
-        frame_adjuster = self.frame_adjuster = backend.FrameAdjuster(weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_swapper_bc_out, bc_out=frame_adjuster_bc_out, backend_db=backend_db )
-        face_merger    = self.face_merger    = backend.FaceMerger   (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=frame_adjuster_bc_out, bc_out=face_merger_bc_out, backend_db=backend_db )
-        stream_output  = self.stream_output  = backend.StreamOutput (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_merger_bc_out, save_default_path=userdata_path, backend_db=backend_db)
+        file_source       = self.file_source       = backend.FileSource           (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_out=multi_sources_bc_out, backend_db=backend_db)
+        camera_source     = self.camera_source     = backend.CameraSource         (weak_heap=backend_weak_heap, bc_out=multi_sources_bc_out, backend_db=backend_db)
+        face_detector     = self.face_detector     = backend.FaceDetector         (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=multi_sources_bc_out, bc_out=face_detector_bc_out, backend_db=backend_db )
+        face_cropper      = self.face_cropper      = backend.FaceCropper          (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_detector_bc_out, bc_out=face_cropper_bc_out, backend_db=backend_db)
+        face_marker       = self.face_marker       = backend.FaceMarker           (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_detector_bc_out, bc_out=face_marker_bc_out, backend_db=backend_db)
+        face_aligner      = self.face_aligner      = backend.FaceAligner          (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_marker_bc_out, bc_out=face_aligner_bc_out, backend_db=backend_db )
+        face_animator     = self.face_animator     = backend.FaceAnimator         (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_merger_bc_out, animatables_path=animatables_path, backend_db=backend_db )
+        lp_animator       = self.lp_animator       = backend.LivePortraitAnimator (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_cropper_bc_out, bc_out=face_merger_bc_out, animatables_path=animatables_path, backend_db=backend_db )
+        face_swap_insight = self.face_swap_insight = backend.FaceSwapInsight      (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_swapper_bc_out, faces_path=animatables_path, backend_db=backend_db )
+        face_swap_dfm     = self.face_swap_dfm     = backend.FaceSwapDFM          (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_aligner_bc_out, bc_out=face_swapper_bc_out, dfm_models_path=dfm_models_path, backend_db=backend_db )
+        frame_adjuster    = self.frame_adjuster    = backend.FrameAdjuster        (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_swapper_bc_out, bc_out=frame_adjuster_bc_out, backend_db=backend_db )
+        face_merger       = self.face_merger       = backend.FaceMerger           (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=frame_adjuster_bc_out, bc_out=face_merger_bc_out, backend_db=backend_db )
+        stream_output     = self.stream_output     = backend.StreamOutput         (weak_heap=backend_weak_heap, reemit_frame_signal=reemit_frame_signal, bc_in=face_merger_bc_out, save_default_path=userdata_path, backend_db=backend_db)
 
-        self.all_backends : List[backend.BackendHost] = [file_source, camera_source, face_detector, face_marker, face_aligner, face_animator, live_portrait_animator, face_swap_insight, face_swap_dfm, frame_adjuster, face_merger, stream_output]
+        self.all_backends : List[backend.BackendHost] = [file_source, camera_source, face_detector, face_cropper, face_marker, face_aligner, face_animator, lp_animator, face_swap_insight, face_swap_dfm, frame_adjuster, face_merger, stream_output]
 
-        self.q_file_source    = QFileSource(self.file_source)
-        self.q_camera_source  = QCameraSource(self.camera_source)
-        self.q_face_detector  = QFaceDetector(self.face_detector)
-        self.q_face_marker    = QFaceMarker(self.face_marker)
-        self.q_face_aligner   = QFaceAligner(self.face_aligner)
-        self.q_face_animator  = QFaceAnimator(self.face_animator, animatables_path=animatables_path)
-        self.q_live_portrait_animator = QLivePortraitAnimator(self.live_portrait_animator, animatables_path=animatables_path)
+        self.q_file_source       = QFileSource(self.file_source)
+        self.q_camera_source     = QCameraSource(self.camera_source)
+        self.q_face_detector     = QFaceDetector(self.face_detector)
+        self.q_face_cropper      = QFaceCropper(self.face_cropper)
+        self.q_face_marker       = QFaceMarker(self.face_marker)
+        self.q_face_aligner      = QFaceAligner(self.face_aligner)
+        self.q_face_animator     = QFaceAnimator(self.face_animator, animatables_path=animatables_path)
+        self.q_lp_animator       = QLivePortraitAnimator(self.lp_animator, animatables_path=animatables_path)
         self.q_face_swap_insight = QFaceSwapInsight(self.face_swap_insight, faces_path=animatables_path)
-        self.q_face_swap_dfm  = QFaceSwapDFM(self.face_swap_dfm, dfm_models_path=dfm_models_path)
-        self.q_frame_adjuster = QFrameAdjuster(self.frame_adjuster)
-        self.q_face_merger    = QFaceMerger(self.face_merger)
-        self.q_stream_output  = QStreamOutput(self.stream_output)
+        self.q_face_swap_dfm     = QFaceSwapDFM(self.face_swap_dfm, dfm_models_path=dfm_models_path)
+        self.q_frame_adjuster    = QFrameAdjuster(self.frame_adjuster)
+        self.q_face_merger       = QFaceMerger(self.face_merger)
+        self.q_stream_output     = QStreamOutput(self.stream_output)
 
-        self.q_ds_frame_viewer = QBCFrameViewer(backend_weak_heap, multi_sources_bc_out)
-        self.q_ds_fa_viewer    = QBCFaceAlignViewer(backend_weak_heap, face_aligner_bc_out, preview_width=256)
-        self.q_ds_fc_viewer    = QBCFaceSwapViewer(backend_weak_heap, face_merger_bc_out, preview_width=256)
+        self.q_ds_frame_viewer        = QBCFrameViewer(backend_weak_heap, multi_sources_bc_out)
+        self.q_ds_cr_viewer           = QBCCropViewer(backend_weak_heap, face_cropper_bc_out, preview_width=256)
+        self.q_ds_fa_viewer           = QBCFaceAlignViewer(backend_weak_heap, face_aligner_bc_out, preview_width=256)
+        self.q_ds_fc_viewer           = QBCFaceSwapViewer(backend_weak_heap, face_merger_bc_out, preview_width=256)
         self.q_ds_merged_frame_viewer = QBCMergedFrameViewer(backend_weak_heap, face_merger_bc_out)
 
         q_nodes = qtx.QXWidgetHBox([    qtx.QXWidgetVBox([self.q_file_source, self.q_camera_source], spacing=5, fixed_width=256),
-                                        qtx.QXWidgetVBox([self.q_face_detector,  self.q_face_aligner,  ], spacing=5, fixed_width=256),
-                                        qtx.QXWidgetVBox([self.q_face_marker, self.q_face_animator, self.q_live_portrait_animator, self.q_face_swap_insight, self.q_face_swap_dfm], spacing=5, fixed_width=256),
+                                        qtx.QXWidgetVBox([self.q_face_detector, self.q_face_cropper], spacing=5, fixed_width=256),
+                                        qtx.QXWidgetVBox([self.q_face_marker, self.q_face_aligner], spacing=5, fixed_width=256),
+                                        qtx.QXWidgetVBox([self.q_face_animator, self.q_lp_animator, self.q_face_swap_insight, self.q_face_swap_dfm], spacing=5, fixed_width=256),
                                         qtx.QXWidgetVBox([self.q_frame_adjuster, self.q_face_merger, self.q_stream_output], spacing=5, fixed_width=256),
                                     ], spacing=5, size_policy=('fixed', 'fixed') )
 
         q_view_nodes = qtx.QXWidgetHBox([   (qtx.QXWidgetVBox([self.q_ds_frame_viewer], fixed_width=256), qtx.AlignTop),
+                                            (qtx.QXWidgetVBox([self.q_ds_cr_viewer], fixed_width=256), qtx.AlignTop),
                                             (qtx.QXWidgetVBox([self.q_ds_fa_viewer], fixed_width=256), qtx.AlignTop),
                                             (qtx.QXWidgetVBox([self.q_ds_fc_viewer], fixed_width=256), qtx.AlignTop),
                                             (qtx.QXWidgetVBox([self.q_ds_merged_frame_viewer], fixed_width=256), qtx.AlignTop),

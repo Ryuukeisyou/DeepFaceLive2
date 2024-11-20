@@ -18,6 +18,7 @@ class BackendFaceSwapInfo:
         self.face_ulmrks : FLandmarks2D = None
 
         self.face_resolution : int = None
+        self.face_crop_image_name : str = None
         self.face_align_image_name : str = None
         self.face_align_mask_name : str = None
         self.face_align_lmrks_mask_name : str = None
@@ -25,6 +26,7 @@ class BackendFaceSwapInfo:
         self.face_swap_image_name : str = None
         self.face_swap_mask_name : str = None
 
+        self.image_to_crop_uni_mat = None
         self.image_to_align_uni_mat = None
         self.face_align_ulmrks : FLandmarks2D = None
 

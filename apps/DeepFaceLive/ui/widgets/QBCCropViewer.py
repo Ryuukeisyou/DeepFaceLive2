@@ -31,20 +31,16 @@ class QBCCropViewer(qtx.QXCollapsibleSection):
         if self._bcd_id != bcd_id:
             # Has new bcd version
             bcd, self._bcd_id = self._bc.get_by_id(bcd_id), bcd_id
-
             if bcd is not None:
                 bcd.assign_weak_heap(self._backed_weak_heap)
 
                 self._layered_images.clear_images()
 
-                frame_image_name = bcd.get_frame_image_name()
-                frame_image = bcd.get_image(frame_image_name)
-
-                if frame_image is not None:
-                    self._layered_images.add_image (frame_image)
-                    h,w = frame_image.shape[:2]
-                    self._info_label.setText(f'{frame_image_name} {w}x{h}')
-
+                for fsi in bcd.get_face_swap_info_list():
+                    face_image = bcd.get_image (fsi.face_crop_image_name)
+                    if face_image is not None:
+                        h,w = face_image.shape[:2]
+                        self._layered_images.add_image(face_image)
 
     def clear(self):
         self._layered_images.clear_images()

@@ -716,6 +716,33 @@ class Localization:
                 'ja-JP' : 'フレームの平均化によりランドマークを安定させます\n静止画やウェブカメラ経由の配信に適しています',
                 'de-DE' : 'Stabilisiert Gesichtspunkte durch das Durchschnittsbilden über die Einzelbilder.\nGut für die Verwendung in statischen Szenen oder mit einer Webcam.'},
 
+    'QFaceCropper.module_title':{
+                'en-US' : 'Face cropper',
+                'ru-RU' : 'Face cropper',
+                'zh-CN' : 'Face cropper',
+                'es-ES' : 'Face cropper',
+                'it-IT' : 'Face cropper',
+                'ja-JP' : 'Face cropper',
+                'de-DE' : 'Face cropper'},
+    
+    'QFaceCropper.coverage':{
+                'en-US' : 'coverage',
+                'ru-RU' : 'Покрытие',
+                'zh-CN' : '覆盖范围',
+                'es-ES' : 'Cobertura',
+                'it-IT' : 'Copertura',
+                'ja-JP' : '範囲',
+                'de-DE' : 'Berichterstattung'},
+
+    'QFaceCropper.help.coverage':{
+                'en-US' : 'coverage',
+                'ru-RU' : 'Покрытие',
+                'zh-CN' : '覆盖范围',
+                'es-ES' : 'Cobertura',
+                'it-IT' : 'Copertura',
+                'ja-JP' : '範囲',
+                'de-DE' : 'Berichterstattung'},
+    
     'QFaceAnimator.module_title':{
                 'en-US' : 'Face animator',
                 'ru-RU' : 'Аниматор лица',
@@ -1203,6 +1230,15 @@ class Localization:
                 'it-IT' : 'Frame sorgente',
                 'ja-JP' : '入力フレーム',
                 'de-DE' : 'Quellbild'},
+
+    'QBCCropViewer.title':{
+                'en-US' : 'Cropped face',
+                'ru-RU' : 'Обрезанное лицо',
+                'zh-CN' : '裁剪的脸',
+                'es-ES' : 'Cara recortada',
+                'it-IT' : 'Faccia ritagliata',
+                'ja-JP' : '顔が切り取られ',
+                'de-DE' : 'Geschnittenes Gesicht'},
 
     'QBCFaceAlignViewer.title':{
                 'en-US' : 'Aligned face',

@@ -5,8 +5,6 @@ from modelhub import onnx as onnx_models
 from modelhub import cv as cv_models
 
 from xlib import os as lib_os
-from xlib.face import ELandmarks2D, FLandmarks2D, FPose
-from xlib.image import ImageProcessor
 from xlib.mp import csw as lib_csw
 
 from .BackendBase import (BackendConnection, BackendDB, BackendHost,
@@ -39,32 +37,31 @@ class FaceCropperWorker(BackendWorker):
         self.bc_in = bc_in
         self.bc_out = bc_out
         self.pending_bcd = None
-        self.opencv_lbf = None
-        self.google_facemesh = None
-        self.insightface_2d106 = None
-        self.temporal_lmrks = []
 
         lib_os.set_timer_resolution(1)
 
         state, cs = self.get_state(), self.get_control_sheet()
         cs.device.call_on_selected(self.on_cs_devices)
         cs.coverage.call_on_number(self.on_cs_coverage)
-
+        
+        cs.coverage.enable()
+        cs.coverage.set_config(lib_csw.Number.Config(min=0.1, max=3.0, step=0.1, decimals=1, allow_instant_update=True))
+        
+        coverage = state.coverage
+        if coverage is None:
+            coverage = 1
+        cs.coverage.set_number(coverage)
+        
+        cs.device.enable()
+        cs.device.set_choices(['CPU'], none_choice_name='@misc.menu_select')
+        cs.device.select(state.device)
 
     def on_cs_devices(self, idx, device):
         state, cs = self.get_state(), self.get_control_sheet()
-        marker_type = state.marker_type
-
-        if device is not None:
-            cropper_state = state.get_cropper_state()
-
-            cs.coverage.enable()
-            cs.coverage.set_config(lib_csw.Number.Config(min=0.1, max=3.0, step=0.1, decimals=1, allow_instant_update=True))
-
-            coverage = cropper_state.coverage
-            cs.coverage.set_number(coverage)
-
+        if device is not None and state.device == device:
+            pass
         else:
+            state.device = device
             self.save_state()
             self.restart()
 
@@ -72,7 +69,7 @@ class FaceCropperWorker(BackendWorker):
     def on_cs_coverage(self, coverage):
         state, cs = self.get_state(), self.get_control_sheet()
         cfg = cs.coverage.get_config()
-        coverage = state.get_cropper_state().coverage = np.clip(coverage, cfg.min, cfg.max)
+        coverage = state.coverage = np.clip(coverage, cfg.min, cfg.max)
         cs.coverage.set_number(coverage)
         self.save_state()
         self.reemit_frame_signal.send()
@@ -81,7 +78,7 @@ class FaceCropperWorker(BackendWorker):
     def on_tick(self):
         state, cs = self.get_state(), self.get_control_sheet()
 
-        if self.pending_bcd is None:
+        if self.pending_bcd is None and state.device is not None and state.coverage is not None:
             self.start_profile_timing()
 
             bcd = self.bc_in.read(timeout=0.005)
@@ -89,23 +86,21 @@ class FaceCropperWorker(BackendWorker):
                 bcd.assign_weak_heap(self.weak_heap)
                 is_frame_reemitted = bcd.get_is_frame_reemitted()
 
-                marker_type = state.marker_type
-                marker_state = state.get_cropper_state()
-
-                if marker_type is not None:
-                    frame_image = bcd.get_image(bcd.get_frame_image_name())
+                if state is not None:
+                    frame_image_name = bcd.get_frame_image_name()
+                    frame_image = bcd.get_image(frame_image_name)
 
                     if frame_image is not None:
                         fsi_list = bcd.get_face_swap_info_list()
-                        if marker_state.temporal_smoothing != 1 and \
-                            len(self.temporal_lmrks) != len(fsi_list):
-                            self.temporal_lmrks = [ [] for _ in range(len(fsi_list)) ]
 
                         for face_id, fsi in enumerate(fsi_list):
                             if fsi.face_urect is not None:
                                 # Cut the face to feed to the face marker
-                                face_image, face_uni_mat = fsi.face_urect.cut(frame_image, marker_state.coverage, 256)
-                                bcd.set_image()
+                                face_image, face_uni_mat = fsi.face_urect.cut(frame_image, state.coverage, 256)
+                                
+                                fsi.image_to_align_uni_mat = face_uni_mat
+                                fsi.face_crop_image_name = f'{frame_image_name}_{face_id}_crop'
+                                bcd.set_image(fsi.face_crop_image_name, face_image)
 
                     self.stop_profile_timing()
                 self.pending_bcd = bcd
@@ -117,18 +112,10 @@ class FaceCropperWorker(BackendWorker):
             else:
                 time.sleep(0.001)
 
-class CropperState(BackendWorkerState):
-    coverage : float = None
-
 class WorkerState(BackendWorkerState):
     def __init__(self):
-        self.cropper_state = {}
-
-    def get_cropper_state(self) -> CropperState:
-        state = self.cropper_state
-        if state is None:
-            state = self.cropper_state = CropperState()
-        return state
+        self.coverage: float = None
+        self.device = None
 
 class Sheet:
     class Host(lib_csw.Sheet.Host):

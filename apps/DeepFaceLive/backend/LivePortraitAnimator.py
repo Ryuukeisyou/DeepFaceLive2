@@ -133,6 +133,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_tick(self):
+        COVERAGE = 1
+        
         state, cs = self.get_state(), self.get_control_sheet()
 
         if self.pending_bcd is None:
@@ -146,20 +148,19 @@ class LivePortraitAnimatorWorker(BackendWorker):
                 if lp_model is not None and self.animatable_img is not None:
 
                     for i, fsi in enumerate(bcd.get_face_swap_info_list()):
-                        if state.animator_face_id == i:
-                            face_align_image = bcd.get_image(fsi.face_align_image_name)
-                            if face_align_image is not None:
-
-                                _,H,W,_ = ImageProcessor(face_align_image).get_dims()
+                        if fsi.face_urect is not None and state.animator_face_id == i:
+                            crop_image = bcd.get_image(fsi.face_crop_image_name)
+                            
+                            if crop_image is not None:
 
                                 if self.driving_ref_motion is None:
                                     pass
                                     # self.driving_ref_motion = lia_model.extract_motion(face_align_image)
+                                
+                                anim_image = lp_model.generate(self.animatable_img, crop_image, self.driving_ref_motion, power=state.relative_power)
+                                anim_image = ImageProcessor(anim_image).get_image('HWC')
 
-                                anim_image = lp_model.generate(self.animatable_img, face_align_image, self.driving_ref_motion, power=state.relative_power)
-                                anim_image = ImageProcessor(anim_image).resize((W,H)).get_image('HWC')
-
-                                fsi.face_swap_image_name = f'{fsi.face_align_image_name}_swapped'
+                                fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
                                 bcd.set_image(fsi.face_swap_image_name, anim_image)
                             break
 
