@@ -796,6 +796,60 @@ class Localization:
                 'it-IT' : 'Animatrice LivePortrait',
                 'ja-JP' : 'LivePortraitアニメーター',
                 'de-DE' : 'Animatrice LivePortrait'},
+
+    'QLivePortraitAnimator.driving_multiplier':{
+                'en-US' : 'driving multiplier',
+                'ru-RU' : 'driving multiplier',
+                'zh-CN' : 'driving multiplier',
+                'es-ES' : 'driving multiplier',
+                'it-IT' : 'driving multiplier',
+                'ja-JP' : 'driving multiplier',
+                'de-DE' : 'driving multiplier'},
+
+    'QLivePortraitAnimator.expression_multiplier':{
+                'en-US' : 'expression multiplier',
+                'ru-RU' : 'expression multiplier',
+                'zh-CN' : 'expression multiplier',
+                'es-ES' : 'expression multiplier',
+                'it-IT' : 'expression multiplier',
+                'ja-JP' : 'expression multiplier',
+                'de-DE' : 'expression multiplier'},
+    
+    'QLivePortraitAnimator.rotation_cap_pitch':{
+                'en-US' : 'rotation cap: pitch',
+                'ru-RU' : 'rotation cap: pitch',
+                'zh-CN' : 'rotation cap: pitch',
+                'es-ES' : 'rotation cap: pitch',
+                'it-IT' : 'rotation cap: pitch',
+                'ja-JP' : 'rotation cap: pitch',
+                'de-DE' : 'rotation cap: pitch'},
+
+    'QLivePortraitAnimator.rotation_cap_yaw':{
+                'en-US' : 'rotation cap: yaw',
+                'ru-RU' : 'rotation cap: yaw',
+                'zh-CN' : 'rotation cap: yaw',
+                'es-ES' : 'rotation cap: yaw',
+                'it-IT' : 'rotation cap: yaw',
+                'ja-JP' : 'rotation cap: yaw',
+                'de-DE' : 'rotation cap: yaw'},
+
+    'QLivePortraitAnimator.rotation_cap_roll':{
+                'en-US' : 'rotation cap: roll',
+                'ru-RU' : 'rotation cap: roll',
+                'zh-CN' : 'rotation cap: roll',
+                'es-ES' : 'rotation cap: roll',
+                'it-IT' : 'rotation cap: roll',
+                'ja-JP' : 'rotation cap: roll',
+                'de-DE' : 'rotation cap: roll'},
+
+    'QLivePortraitAnimator.stitching':{
+                'en-US' : 'stitching',
+                'ru-RU' : 'stitching',
+                'zh-CN' : 'stitching',
+                'es-ES' : 'stitching',
+                'it-IT' : 'stitching',
+                'ja-JP' : 'stitching',
+                'de-DE' : 'stitching'},
     
     'QFaceSwapInsight.module_title':{
                 'en-US' : 'Face swap (Insight)',
