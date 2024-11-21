@@ -814,7 +814,25 @@ class Localization:
                 'it-IT' : 'expression multiplier',
                 'ja-JP' : 'expression multiplier',
                 'de-DE' : 'expression multiplier'},
-    
+
+    'QLivePortraitAnimator.rotation_multiplier':{
+                'en-US' : 'rotation multiplier',
+                'ru-RU' : 'rotation multiplier',
+                'zh-CN' : 'rotation multiplier',
+                'es-ES' : 'rotation multiplier',
+                'it-IT' : 'rotation multiplier',
+                'ja-JP' : 'rotation multiplier',
+                'de-DE' : 'rotation multiplier'},
+
+    'QLivePortraitAnimator.translation_multiplier':{
+                'en-US' : 'translation multiplier',
+                'ru-RU' : 'translation multiplier',
+                'zh-CN' : 'translation multiplier',
+                'es-ES' : 'translation multiplier',
+                'it-IT' : 'translation multiplier',
+                'ja-JP' : 'translation multiplier',
+                'de-DE' : 'translation multiplier'},
+
     'QLivePortraitAnimator.rotation_cap_pitch':{
                 'en-US' : 'rotation cap: pitch',
                 'ru-RU' : 'rotation cap: pitch',

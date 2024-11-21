@@ -43,7 +43,13 @@ class QLivePortraitAnimator(QBackendPanel):
         
         q_expression_multiplier_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.expression_multiplier') )
         q_expression_multiplier = QSliderCSWNumber(cs.expression_multiplier, reflect_state_widgets=[q_expression_multiplier_label])
-        
+
+        q_rotation_multiplier_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.rotation_multiplier') )
+        q_rotation_multiplier = QSliderCSWNumber(cs.rotation_multiplier, reflect_state_widgets=[q_rotation_multiplier_label])
+
+        q_translation_multiplier_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.translation_multiplier') )
+        q_translation_multiplier = QSliderCSWNumber(cs.translation_multiplier, reflect_state_widgets=[q_translation_multiplier_label])
+
         q_driving_multiplier_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.driving_multiplier') )
         q_driving_multiplier = QSliderCSWNumber(cs.driving_multiplier, reflect_state_widgets=[q_driving_multiplier_label])
         
@@ -74,6 +80,12 @@ class QLivePortraitAnimator(QBackendPanel):
         row += 1
         grid_l.addWidget(q_expression_multiplier_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addWidget(q_expression_multiplier, row, 1 )
+        row += 1
+        grid_l.addWidget(q_rotation_multiplier_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
+        grid_l.addWidget(q_rotation_multiplier, row, 1 )
+        row += 1
+        grid_l.addWidget(q_translation_multiplier_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
+        grid_l.addWidget(q_translation_multiplier, row, 1 )
         row += 1
         grid_l.addWidget(q_driving_multiplier_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addWidget(q_driving_multiplier, row, 1 )

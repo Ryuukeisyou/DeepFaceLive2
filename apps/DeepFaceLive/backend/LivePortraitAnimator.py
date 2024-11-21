@@ -55,6 +55,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
         cs.animator_face_id.call_on_number(self.on_cs_animator_face_id)
         cs.expression_multiplier.call_on_number(self.on_cs_expression_multiplier)
+        cs.rotation_multiplier.call_on_number(self.on_cs_rotation_multiplier)
+        cs.translation_multiplier.call_on_number(self.on_cs_translation_multiplier)
         cs.driving_multiplier.call_on_number(self.on_cs_driving_multiplier)
         cs.rotation_cap_pitch.call_on_number(self.on_cs_rotation_cap_pitch)
         cs.rotation_cap_yaw.call_on_number(self.on_cs_rotation_cap_yaw)
@@ -86,9 +88,17 @@ class LivePortraitAnimatorWorker(BackendWorker):
             cs.animator_face_id.set_number(state.animator_face_id if state.animator_face_id is not None else 0)
             
             cs.expression_multiplier.enable()
-            cs.expression_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=3.0, step=0.01, decimals=2, allow_instant_update=True))
+            cs.expression_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=4.0, step=0.01, decimals=2, allow_instant_update=True))
             cs.expression_multiplier.set_number(state.expression_multiplier if state.expression_multiplier is not None else 1.0)
-            
+
+            cs.rotation_multiplier.enable()
+            cs.rotation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
+            cs.rotation_multiplier.set_number(state.rotation_multiplier if state.rotation_multiplier is not None else 1.0)
+
+            cs.translation_multiplier.enable()
+            cs.translation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
+            cs.translation_multiplier.set_number(state.translation_multiplier if state.translation_multiplier is not None else 1.0)
+
             cs.driving_multiplier.enable()
             cs.driving_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
             cs.driving_multiplier.set_number(state.driving_multiplier if state.driving_multiplier is not None else 1.0)
@@ -125,17 +135,13 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
         if animatable is not None:
             try:
-                W,H = self.live_portrait_model.get_input_size()
                 ip = ImageProcessor(lib_cv2.imread(self.animatables_path / animatable))
-                ip.fit_in(TW=W, TH=H, pad_to_target=True, allow_upscale=True)
-
                 self.animatable_img = ip.get_image('HWC')
             except Exception as e:
                 cs.animatable.unselect()
 
         self.save_state()
         self.reemit_frame_signal.send()
-
 
     def on_cs_animator_face_id(self, animator_face_id):
         state, cs = self.get_state(), self.get_control_sheet()
@@ -150,6 +156,22 @@ class LivePortraitAnimatorWorker(BackendWorker):
         cfg = cs.expression_multiplier.get_config()
         expression_multiplier = state.expression_multiplier = float(np.clip(expression_multiplier, cfg.min, cfg.max))
         cs.expression_multiplier.set_number(expression_multiplier)
+        self.save_state()
+        self.reemit_frame_signal.send()
+
+    def on_cs_rotation_multiplier(self, rotation_multiplier):
+        state, cs = self.get_state(), self.get_control_sheet()
+        cfg = cs.rotation_multiplier.get_config()
+        rotation_multiplier = state.rotation_multiplier = float(np.clip(rotation_multiplier, cfg.min, cfg.max))
+        cs.rotation_multiplier.set_number(rotation_multiplier)
+        self.save_state()
+        self.reemit_frame_signal.send()
+
+    def on_cs_translation_multiplier(self, translation_multiplier):
+        state, cs = self.get_state(), self.get_control_sheet()
+        cfg = cs.translation_multiplier.get_config()
+        translation_multiplier = state.translation_multiplier = float(np.clip(translation_multiplier, cfg.min, cfg.max))
+        cs.translation_multiplier.set_number(translation_multiplier)
         self.save_state()
         self.reemit_frame_signal.send()
 
@@ -186,6 +208,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_cs_stitching(self, stitching):
+        self.live_portrait_model.clear_source_cache()
         state, cs = self.get_state(), self.get_control_sheet()
         cs.stitching.set_flag(stitching)
         state.stitching = stitching
@@ -221,6 +244,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     self.animatable_img, 
                                     crop_image, 
                                     expression_multiplier=state.expression_multiplier,
+                                    rotation_multiplier=state.rotation_multiplier,
+                                    translation_multiplier=state.translation_multiplier,
                                     driving_multiplier=state.driving_multiplier, 
                                     rotation_cap_pitch=state.rotation_cap_pitch,
                                     rotation_cap_yaw=state.rotation_cap_yaw,
@@ -252,6 +277,8 @@ class Sheet:
             self.update_animatables = lib_csw.Signal.Client()
             self.reset_reference_pose = lib_csw.Signal.Client()
             self.expression_multiplier = lib_csw.Number.Client()
+            self.rotation_multiplier = lib_csw.Number.Client()
+            self.translation_multiplier = lib_csw.Number.Client()
             self.driving_multiplier = lib_csw.Number.Client()
             self.rotation_cap_pitch = lib_csw.Number.Client()
             self.rotation_cap_yaw= lib_csw.Number.Client()
@@ -267,6 +294,8 @@ class Sheet:
             self.update_animatables = lib_csw.Signal.Host()
             self.reset_reference_pose = lib_csw.Signal.Host()
             self.expression_multiplier = lib_csw.Number.Host()
+            self.rotation_multiplier = lib_csw.Number.Host()
+            self.translation_multiplier = lib_csw.Number.Host()
             self.driving_multiplier = lib_csw.Number.Host()
             self.rotation_cap_pitch = lib_csw.Number.Host()
             self.rotation_cap_yaw = lib_csw.Number.Host()
@@ -278,6 +307,8 @@ class WorkerState(BackendWorkerState):
     animatable : str = None
     animator_face_id : int = None
     expression_multiplier : float = None
+    rotation_multiplier : float = None
+    translation_multiplier: float = None
     driving_multiplier : float = None
     rotation_cap_pitch: float = None
     rotation_cap_yaw: float = None
