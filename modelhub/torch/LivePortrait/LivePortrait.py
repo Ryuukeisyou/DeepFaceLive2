@@ -74,6 +74,8 @@ class LivePortrait:
         
         self.x_d_0 = None
         self.motion_multiplier = None
+        
+        self.x_d_list = []
 
 
     def get_input_size(self):
@@ -223,12 +225,14 @@ class LivePortrait:
             else:
                 ip_s = ImageProcessor(img_source[:,:,:3]).resize(SOURCE_SIZE, interpolation=ImageProcessor.Interpolation.LANCZOS4)
                 i_s = ip_s.get_image('HWC')
+            self.i_s = i_s
             i_t_s = torch.from_numpy(i_s).permute(2, 0, 1).unsqueeze(0).to('cuda')
             i_t_s = (i_t_s / 255).to(torch.float16)
             self.x_s_info = self.live_portrait_wrapper_animal.get_kp_info(i_t_s)
             self.f_s = self.live_portrait_wrapper_animal.extract_feature_3d(i_t_s)
             self.x_s = self.live_portrait_wrapper_animal.transform_keypoint(self.x_s_info)
         
+        i_s = self.i_s
         x_c_s = self.x_s_info['kp']
         f_s = self.f_s
         x_s = self.x_s
@@ -273,6 +277,15 @@ class LivePortrait:
         
         x_d_i = x_s + (x_d_i - x_s) * driving_multiplier
         
+        self.x_d_list.append(x_d_i)
+        self.x_d_list = self.x_d_list[-5:]
+        if len(self.x_d_list) < 5:
+            I_p = self.i_s
+        else:
+            self.x_d_list = smooth([i.cpu() for i in self.x_d_list], self.x_d_list[0].shape, device='cuda', observation_variance=3e-6)
+        
+        x_d_i = self.x_d_list[0].to('cuda')
+                
         out = self.live_portrait_wrapper_animal.warp_decode(f_s, x_s, x_d_i)
         I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
         
