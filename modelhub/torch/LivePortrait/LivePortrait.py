@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import torch
 from torch import Tensor
+
 from xlib.file import SplittedFile
 from xlib.image import ImageProcessor
 from xlib.onnxruntime import (InferenceSession_with_device, ORTDeviceInfo,
@@ -51,18 +52,21 @@ class LivePortrait:
     def __init__(self, device_info : ORTDeviceInfo):
         if device_info not in LivePortrait.get_available_devices():
             raise Exception(f'device_info {device_info} is not in available devices for LIA')
-        
+                
         # generator_path = Path(__file__).parent / 'generator.onnx'
         # SplittedFile.merge(generator_path, delete_parts=False)
         # if not generator_path.exists():
         #     raise FileNotFoundError(f'{generator_path} not found')
             
         # self._generator = InferenceSession_with_device(str(generator_path), device_info)
-        
-        inference_cfg = InferenceConfig(driving_smooth_observation_variance=3e-7)
-        crop_cfg = CropConfig()
+
+        device_id = device_id=device_info.get_index()
+        inference_cfg = InferenceConfig(device_id=device_id, flag_do_torch_compile=False)
+        crop_cfg = CropConfig(device_id=device_id)
         self.live_portrait_wrapper_animal = LivePortraitWrapperAnimal(inference_cfg)
         self.cropper = Cropper(crop_cfg=crop_cfg, image_type='animal_face', flag_use_half_precision=inference_cfg.flag_use_half_precision)
+        self.device = self.live_portrait_wrapper_animal.device
+        
         
         self.i_s_orig = None
         self.crop_info = None
@@ -99,85 +103,13 @@ class LivePortrait:
             if value > 0:
                 return (cap - threshold * cap) / (max - threshold * cap) * (value - threshold * cap) + threshold * cap
             else:
-                return (-threshold * cap - (-cap)) / (-threshold * cap - (-max)) * (value - (-max)) + (-cap)
-    
-    def calc_fe(self, exp, rotate_pitch, rotate_yaw, rotate_roll, 
-                eyes:float=0, 
-                eyebrow:float=0, 
-                wink:float=0, 
-                pupil_x:float=0, 
-                pupil_y:float=0, 
-                mouth:float=0, 
-                eee:float=0, 
-                woo:float=0,
-                smile:float=0):
-
-        exp[0, 20, 1] += smile * -0.01
-        exp[0, 14, 1] += smile * -0.02
-        exp[0, 17, 1] += smile * 0.0065
-        exp[0, 17, 2] += smile * 0.003
-        exp[0, 13, 1] += smile * -0.00275
-        exp[0, 16, 1] += smile * -0.00275
-        exp[0, 3, 1] += smile * -0.0035
-        exp[0, 7, 1] += smile * -0.0035
-
-        exp[0, 19, 1] += mouth * 0.001
-        exp[0, 19, 2] += mouth * 0.0001
-        exp[0, 17, 1] += mouth * -0.0001
-        rotate_pitch -= mouth * 0.05
-
-        exp[0, 20, 2] += eee * -0.001
-        exp[0, 20, 1] += eee * -0.001
-        #x_d_new[0, 19, 1] += eee * 0.0006
-        exp[0, 14, 1] += eee * -0.001
-
-        exp[0, 14, 1] += woo * 0.001
-        exp[0, 3, 1] += woo * -0.0005
-        exp[0, 7, 1] += woo * -0.0005
-        exp[0, 17, 2] += woo * -0.0005
-
-        exp[0, 11, 1] += wink * 0.001
-        exp[0, 13, 1] += wink * -0.0003
-        exp[0, 17, 0] += wink * 0.0003
-        exp[0, 17, 1] += wink * 0.0003
-        exp[0, 3, 1] += wink * -0.0003
-        
-        rotate_roll -= wink * 0.1
-        rotate_yaw -= wink * 0.1
-
-        if 0 < pupil_x:
-            exp[0, 11, 0] += pupil_x * 0.0007
-            exp[0, 15, 0] += pupil_x * 0.001
-        else:
-            exp[0, 11, 0] += pupil_x * 0.001
-            exp[0, 15, 0] += pupil_x * 0.0007
-
-        exp[0, 11, 1] += pupil_y * -0.001
-        exp[0, 15, 1] += pupil_y * -0.001
-        eyes -= pupil_y / 2.
-
-        exp[0, 11, 1] += eyes * -0.001
-        exp[0, 13, 1] += eyes * 0.0003
-        exp[0, 15, 1] += eyes * -0.001
-        exp[0, 16, 1] += eyes * 0.0003
-        exp[0, 1, 1] += eyes * -0.00025
-        exp[0, 2, 1] += eyes * 0.00025
-
-        if 0 < eyebrow:
-            exp[0, 1, 1] += eyebrow * 0.001
-            exp[0, 2, 1] += eyebrow * -0.001
-        else:
-            exp[0, 1, 0] += eyebrow * -0.001
-            exp[0, 2, 0] += eyebrow * 0.001
-            exp[0, 1, 1] += eyebrow * 0.0003
-            exp[0, 2, 1] += eyebrow * -0.0003
-
-        return rotate_pitch, rotate_yaw, rotate_roll
+                return (-threshold * cap - (-cap)) / (-threshold * cap - (-max)) * (value - (-max)) + (-cap)       
     
     def generate(self, 
                  img_source : np.ndarray, 
                  img_driver : np.ndarray, 
                  is_image: bool = True,
+                 max_dim: int = 640,
                  expression_multiplier: float = 1.5,
                  rotation_multiplier: float = 1,
                  translation_multiplier: float = 1,
@@ -196,6 +128,16 @@ class LivePortrait:
          
          img_driver             np.ndarray      HW HWC 1HWC   uint8/float32
          
+         is_image               bool            source is image or video
+         
+         max_dim                int             input max dimension
+         
+         expression_multiplier  float           expression multiplier
+         
+         rotation_multiplier    float           rotation multiplier
+         
+         translation_multipler  float           translation multiplier
+         
          driving_multiplier     float           driving multiplier
                   
          rotation_cap_pitch     float           rotation cap for pitch
@@ -203,13 +145,14 @@ class LivePortrait:
          rotation_cap_yaw       float           rotation cap for yaw
          
          rotation_cap_roll      float           rotation cap for roll
+        
         """
         
         DRIVER_SIZE = (256, 256)
         SOURCE_SIZE = (256, 256)
         
         if self.x_s_info is None or not is_image:
-            i_s_orig = resize_to_limit(img_source[:,:,:3], 512)
+            i_s_orig = resize_to_limit(img_source[:,:,:3], max_dim)
             if do_crop:
                 crop_info = self.cropper.crop_source_image(i_s_orig, self.cropper.crop_cfg)
                 self.crop_info = crop_info
@@ -226,7 +169,7 @@ class LivePortrait:
                 ip_s = ImageProcessor(img_source[:,:,:3]).resize(SOURCE_SIZE, interpolation=ImageProcessor.Interpolation.LANCZOS4)
                 i_s = ip_s.get_image('HWC')
             self.i_s = i_s
-            i_t_s = torch.from_numpy(i_s).permute(2, 0, 1).unsqueeze(0).to('cuda')
+            i_t_s = torch.from_numpy(i_s).permute(2, 0, 1).unsqueeze(0).to(self.device)
             i_t_s = (i_t_s / 255).to(torch.float16)
             self.x_s_info = self.live_portrait_wrapper_animal.get_kp_info(i_t_s)
             self.f_s = self.live_portrait_wrapper_animal.extract_feature_3d(i_t_s)
@@ -239,7 +182,7 @@ class LivePortrait:
 
         ip_d = ImageProcessor(img_driver).resize(DRIVER_SIZE, interpolation=ImageProcessor.Interpolation.LANCZOS4)
         i_d = ip_d.get_image('HWC')
-        i_t_d = torch.from_numpy(i_d).permute(2, 0, 1).unsqueeze(0).to('cuda')
+        i_t_d = torch.from_numpy(i_d).permute(2, 0, 1).unsqueeze(0).to(self.device)
         i_t_d = (i_t_d / 255).to(torch.float16)
         xs_info = self.live_portrait_wrapper_animal.get_kp_info(i_t_d)
         
@@ -278,14 +221,21 @@ class LivePortrait:
         x_d_i = x_s + (x_d_i - x_s) * driving_multiplier
         
         self.x_d_list.append(x_d_i)
-        self.x_d_list = self.x_d_list[-5:]
-        if len(self.x_d_list) < 5:
-            I_p = self.i_s
+        # buffer not enough
+        if len(self.x_d_list) < 4:
+            x_d_i = self.x_d_list[0].to(self.device)
+        # buffer enough
         else:
-            self.x_d_list = smooth([i.cpu() for i in self.x_d_list], self.x_d_list[0].shape, device='cuda', observation_variance=3e-6)
+            if len(self.x_d_list) == 4:
+                self.x_d_list = smooth([i.cpu() for i in self.x_d_list], self.x_d_list[0].shape, device=self.device, observation_variance=3e-6)
+                x_d_i = self.x_d_list[0].to(self.device)
+            elif len(self.x_d_list) == 5:
+                x_d_i = self.x_d_list[1].to(self.device)
+            else:
+                self.x_d_list = self.x_d_list[-4:]
+                self.x_d_list = smooth([i.cpu() for i in self.x_d_list], self.x_d_list[0].shape, device=self.device, observation_variance=3e-6)
+                x_d_i = self.x_d_list[0].to(self.device)
         
-        x_d_i = self.x_d_list[0].to('cuda')
-                
         out = self.live_portrait_wrapper_animal.warp_decode(f_s, x_s, x_d_i)
         I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
         
