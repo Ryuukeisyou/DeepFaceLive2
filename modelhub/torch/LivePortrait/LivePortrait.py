@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 from typing import List
 
 import numpy as np
@@ -62,11 +63,21 @@ class LivePortrait:
 
         device_id = device_id=device_info.get_index()
         inference_cfg = InferenceConfig(device_id=device_id, flag_do_torch_compile=False)
-        crop_cfg = CropConfig(device_id=device_id)
+        crop_cfg = CropConfig(device_id=device_id, scale=2.6, scale_crop_driving_video=2.4)
         self.live_portrait_wrapper_animal = LivePortraitWrapperAnimal(inference_cfg)
         self.cropper = Cropper(crop_cfg=crop_cfg, image_type='animal_face', flag_use_half_precision=inference_cfg.flag_use_half_precision)
         self.device = self.live_portrait_wrapper_animal.device
         
+        self.t_pre = 0
+        self.t_drive = 0
+        self.t_kalman = 0
+        self.t_warp_decode = 0
+        self.t_post = 0
+        self.t_pre_count = 0
+        self.t_drive_count = 0
+        self.t_kalman_count = 0
+        self.t_warp_decode_count = 0
+        self.t_post_count = 0
         
         self.i_s_orig = None
         self.crop_info = None
@@ -109,7 +120,7 @@ class LivePortrait:
                  img_source : np.ndarray, 
                  img_driver : np.ndarray, 
                  is_image: bool = True,
-                 max_dim: int = 640,
+                 max_dim: int = 720,
                  expression_multiplier: float = 1.5,
                  rotation_multiplier: float = 1,
                  translation_multiplier: float = 1,
@@ -180,37 +191,59 @@ class LivePortrait:
         f_s = self.f_s
         x_s = self.x_s
 
+
+        # preprocess driving image
+        t0 = time.perf_counter()
         ip_d = ImageProcessor(img_driver).resize(DRIVER_SIZE, interpolation=ImageProcessor.Interpolation.LANCZOS4)
         i_d = ip_d.get_image('HWC')
         i_t_d = torch.from_numpy(i_d).permute(2, 0, 1).unsqueeze(0).to(self.device)
         i_t_d = (i_t_d / 255).to(torch.float16)
+        t1 = time.perf_counter()
+        self.t_pre += t1 - t0
+        self.t_pre_count += 1
+        if self.t_pre_count == 100:
+            print(f'[INFO] average preprocess time {self.t_pre / self.t_pre_count * 1000 :.2f}')
+            self.t_pre = 0
+            self.t_pre_count = 0
+        
+        
+        # prepare driving data
+        t0 = time.perf_counter()
+        
+        # compute driving key point info
         xs_info = self.live_portrait_wrapper_animal.get_kp_info(i_t_d)
         
-        # cap and scale rotation
+        # cap and scale rotation angle
         xs_info['pitch'] = self.cap_value(xs_info['pitch'], rotation_cap_pitch, 180) * rotation_multiplier
         xs_info['yaw'] = self.cap_value(xs_info['yaw'], rotation_cap_yaw, 180) * rotation_multiplier
         xs_info['roll'] = self.cap_value(xs_info['roll'], rotation_cap_roll, 180) * rotation_multiplier
         
+        # expression
         delta_new = xs_info['exp']
         
-        # p, y, r = self.calc_fe(delta_new, kp_info_d['pitch'], kp_info_d['yaw'], kp_info_d['roll'])
-        # R_d = get_rotation_matrix(kp_info_d['pitch'] + p, kp_info_d['yaw'] + y, kp_info_d['roll'] + r)
-        
+        # rotaion
         R_d = get_rotation_matrix(xs_info['pitch'], xs_info['yaw'], xs_info['roll'])
         
+        # transform
         t_new = xs_info['t']
         t_new[..., 2].fill_(0)
+        
+        # scale
         scale_new = xs_info['scale']
         
+        # driving data
         x_d_i = scale_new * (x_c_s @ R_d + delta_new * expression_multiplier) + t_new * translation_multiplier
         
+        # save first driving data
         if self.x_d_0 is None:
             self.x_d_0 = x_d_i
             self.motion_multiplier = calc_motion_multiplier(x_s, self.x_d_0)
         
+        # retrieve first driving data
         x_d_0 = self.x_d_0
         motion_multiplier = self.motion_multiplier
         
+        # calculate difference
         x_d_diff = (x_d_i - x_d_0) * motion_multiplier
         x_d_i = x_d_diff + x_s
         
@@ -219,6 +252,18 @@ class LivePortrait:
             x_d_i = self.live_portrait_wrapper_animal.stitching(x_s, x_d_i)
         
         x_d_i = x_s + (x_d_i - x_s) * driving_multiplier
+        
+        t1 = time.perf_counter()
+        self.t_drive += t1 - t0
+        self.t_drive_count += 1
+        if self.t_drive_count == 100:
+            print(f'[INFO] average driving computation time {self.t_drive / self.t_drive_count * 1000 :.2f}')
+            self.t_drive = 0
+            self.t_drive_count = 0
+        
+        
+        # kalman filter smoothing
+        t0 = time.perf_counter()
         
         self.x_d_list.append(x_d_i)
         # buffer not enough
@@ -236,13 +281,46 @@ class LivePortrait:
                 self.x_d_list = smooth([i.cpu() for i in self.x_d_list], self.x_d_list[0].shape, device=self.device, observation_variance=3e-6)
                 x_d_i = self.x_d_list[0].to(self.device)
         
-        out = self.live_portrait_wrapper_animal.warp_decode(f_s, x_s, x_d_i)
-        I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
+        t1 = time.perf_counter()
+        self.t_kalman += t1 - t0
+        self.t_kalman_count += 1
+        if self.t_kalman_count == 100:
+            print(f'[INFO] average kalman smooth time {self.t_kalman / self.t_kalman_count * 1000 :.2f}')
+            self.t_kalman = 0
+            self.t_kalman_count = 0
+            
         
+        # warp and decode
+        t0 = time.perf_counter()
+        
+        out = self.live_portrait_wrapper_animal.warp_decode(f_s, x_s, x_d_i)
+        
+        t1 = time.perf_counter()
+        self.t_warp_decode += t1 - t0
+        self.t_warp_decode_count += 1
+        if self.t_warp_decode_count == 100:
+            print(f'[INFO] average warp decode time {self.t_warp_decode / self.t_warp_decode_count * 1000 :.2f}')
+            self.t_warp_decode = 0
+            self.t_warp_decode_count = 0
+        
+        
+        # postprocessing
+        t0 = time.perf_counter()
+        
+        I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
+              
         # paste back if flag pastback and do_crop and stitching
         if pasteback and do_crop and stitching:
             I_p_pstbk = paste_back(I_p, self.crop_info['M_c2o'], self.i_s_orig, self.mask_ori_float)
-            return I_p_pstbk
+            I_p = I_p_pstbk
+        
+        t1 = time.perf_counter()
+        self.t_post += t1 - t0
+        self.t_post_count += 1
+        if self.t_post_count == 100:
+            print(f'[INFO] average postprocessing time {self.t_post / self.t_post_count * 1000 :.2f}')
+            self.t_post = 0
+            self.t_post_count = 0
         
         # ip = ImageProcessor(img_source)
         # dtype = ip.get_dtype()

@@ -219,9 +219,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.live_portrait_model.clear_ref_motion_cache()
         self.reemit_frame_signal.send()
 
-    def on_tick(self):
-        COVERAGE = 1
-        
+    def on_tick(self):        
         state, cs = self.get_state(), self.get_control_sheet()
 
         if self.pending_bcd is None:
@@ -252,9 +250,12 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     rotation_cap_roll=state.rotation_cap_roll,
                                     stitching=state.stitching)
                                 anim_image = ImageProcessor(anim_image).get_image('HWC')
-
-                                fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
-                                bcd.set_image(fsi.face_swap_image_name, anim_image)
+                           
+                            else:
+                                anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
+                        
+                            fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
+                            bcd.set_image(fsi.face_swap_image_name, anim_image)
                             break
 
                 self.stop_profile_timing()
