@@ -25,6 +25,8 @@ class BackendFaceSwapInfo:
         self.face_anim_image_name : str = None
         self.face_swap_image_name : str = None
         self.face_swap_mask_name : str = None
+        
+        self.live_portrait_raw_out_name : str = None
 
         self.image_to_crop_uni_mat = None
         self.image_to_align_uni_mat = None

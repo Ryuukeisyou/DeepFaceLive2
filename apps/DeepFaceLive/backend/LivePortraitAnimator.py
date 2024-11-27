@@ -238,7 +238,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
                             
                             if crop_image is not None:
 
-                                anim_image = lp_model.generate(
+                                anim_image, flag_source_changed, M_c2o, i_s_orig, mask_ori_float  = lp_model.generate(
                                     self.animatable_img, 
                                     crop_image, 
                                     expression_multiplier=state.expression_multiplier,
@@ -249,13 +249,23 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     rotation_cap_yaw=state.rotation_cap_yaw,
                                     rotation_cap_roll=state.rotation_cap_roll,
                                     stitching=state.stitching)
-                                anim_image = ImageProcessor(anim_image).get_image('HWC')
+                                
+                                anim_image= ImageProcessor(anim_image).get_image('HWC')
+                                fsi.live_portrait_raw_out_name = f'{fsi.image_name}_lp_raw'
+                                bcd.set_image(fsi.live_portrait_raw_out_name, anim_image)
+                                
+                                bcd.set_file('lp_flag_source_changed', (1 if flag_source_changed else 0).to_bytes())
+                                bcd.set_file('lp_stitching', (1 if state.stitching else 0).to_bytes())
+                                if flag_source_changed and state.stitching:
+                                    bcd.set_file('lp_M_c2o', M_c2o.tobytes())
+                                    bcd.set_image('lp_i_s_orig', ImageProcessor(i_s_orig).get_image('HWC'))
+                                    bcd.set_file('lp_mask_ori_float', mask_ori_float.tobytes())
                            
                             else:
                                 anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
-                        
-                            fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
-                            bcd.set_image(fsi.face_swap_image_name, anim_image)
+                                fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
+                                bcd.set_image(fsi.face_swap_image_name, anim_image)
+                                
                             break
 
                 self.stop_profile_timing()

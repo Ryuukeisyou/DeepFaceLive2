@@ -17,14 +17,14 @@ from .BackendBase import (BackendConnection, BackendDB, BackendHost,
 
 
 class LivePortraitPostprocess(BackendHost):
-    def __init__(self, weak_heap : BackendWeakHeap, reemit_frame_signal : BackendSignal, bc_in : BackendConnection, bc_out : BackendConnection, animatables_path : Path, backend_db : BackendDB = None,
+    def __init__(self, weak_heap : BackendWeakHeap, reemit_frame_signal : BackendSignal, bc_in : BackendConnection, bc_out : BackendConnection, backend_db : BackendDB = None,
                   id : int = 0):
         self._id = id
         super().__init__(backend_db=backend_db,
                          sheet_cls=Sheet,
                          worker_cls=LivePortraitPostprocessWorker,
                          worker_state_cls=WorkerState,
-                         worker_start_args=[weak_heap, reemit_frame_signal, bc_in, bc_out, animatables_path])
+                         worker_start_args=[weak_heap, reemit_frame_signal, bc_in, bc_out])
 
     def get_control_sheet(self) -> 'Sheet.Host': return super().get_control_sheet()
 
@@ -35,28 +35,20 @@ class LivePortraitPostprocessWorker(BackendWorker):
     def get_state(self) -> 'WorkerState': return super().get_state()
     def get_control_sheet(self) -> 'Sheet.Worker': return super().get_control_sheet()
 
-    def on_start(self, weak_heap : BackendWeakHeap, reemit_frame_signal : BackendSignal, bc_in : BackendConnection, bc_out : BackendConnection, animatables_path : Path):
+    def on_start(self, weak_heap : BackendWeakHeap, reemit_frame_signal : BackendSignal, bc_in : BackendConnection, bc_out : BackendConnection):
         self.weak_heap = weak_heap
         self.reemit_frame_signal = reemit_frame_signal
         self.bc_in = bc_in
         self.bc_out = bc_out
         self.pending_bcd = None
         
+        self.lp_M_c2o = None
+        self.lp_i_s_orig = None
+        self.lp_mask_ori_float = None
+        
         lib_os.set_timer_resolution(1)
 
         state, cs = self.get_state(), self.get_control_sheet()
-
-        cs.stitching.call_on_flag(self.on_cs_stitching)
-        cs.stitching.enable()
-        cs.stitching.set_flag(state.stitching)
-
-    def on_cs_stitching(self, stitching):
-        self.live_portrait_model.clear_source_cache()
-        state, cs = self.get_state(), self.get_control_sheet()
-        cs.stitching.set_flag(stitching)
-        state.stitching = stitching
-        self.save_state()
-        self.reemit_frame_signal.send()
 
     def on_tick(self):        
         state, cs = self.get_state(), self.get_control_sheet()
@@ -72,13 +64,16 @@ class LivePortraitPostprocessWorker(BackendWorker):
                     lp_raw_out = bcd.get_image(fsi.live_portrait_raw_out_name)
                     if lp_raw_out is not None:
                         out_img = (lp_raw_out * 255).astype(np.uint8)
-                        lp_flag_source_changed = bcd.get_file('lp_flag_source_changed')
-                        if lp_flag_source_changed == 1:
-                            self.lp_M_c2o = np.fromfile(bcd.get_file('lp_M_c2o'))
-                            self.lp_i_s_orig = np.fromfile(bcd.get_file('lp_i_s_orig'))
-                            self.lp_mask_ori_float = np.fromfile(bcd.get_file('lp_mask_ori_float'))
-                        stiching = int(bcd.get_file('lp_stitching'))
-                        if stiching == 1:
+                        lp_stitching = bcd.get_file('lp_stitching')
+                        lp_stitching = int.from_bytes(bcd.get_file('lp_stitching'))
+                        if lp_stitching == 1:
+                            lp_flag_source_changed = int.from_bytes(bcd.get_file('lp_flag_source_changed'))
+                            if lp_flag_source_changed == 1 or self.lp_M_c2o is None:
+                                lp_M_c2o = bcd.get_file('lp_M_c2o')
+                                if lp_M_c2o is not None:
+                                    self.lp_M_c2o = np.frombuffer(lp_M_c2o, np.float32).reshape((3, 3))
+                                    self.lp_i_s_orig = bcd.get_image('lp_i_s_orig')
+                                    self.lp_mask_ori_float = np.frombuffer(bcd.get_file('lp_mask_ori_float'), np.float32).reshape(self.lp_i_s_orig.shape) 
                             out_img = LivePortrait.paste_back(out_img, self.lp_M_c2o, self.lp_i_s_orig, self.lp_mask_ori_float)
                         
                         out_img = ImageProcessor(out_img).get_image('HWC')
@@ -100,12 +95,13 @@ class Sheet:
     class Host(lib_csw.Sheet.Host):
         def __init__(self):
             super().__init__()
-            self.stitching = lib_csw.Flag.Client()
+            # self.stitching = lib_csw.Flag.Client()
 
     class Worker(lib_csw.Sheet.Worker):
         def __init__(self):
             super().__init__()
-            self.stitching = lib_csw.Flag.Host()
+            # self.stitching = lib_csw.Flag.Host()
 
 class WorkerState(BackendWorkerState):
-    stitching: bool = None
+    pass
+    # stitching: bool = None

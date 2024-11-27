@@ -4,7 +4,7 @@ from localization import L
 from resources.gfx import QXImageDB
 from xlib import qt as qtx
 
-from ..backend import LivePortraitAnimator
+from ..backend import FasterLivePortraitAnimator
 from .widgets.QBackendPanel import QBackendPanel
 from .widgets.QCheckBoxCSWFlag import QCheckBoxCSWFlag
 from .widgets.QComboBoxCSWDynamicSingleSwitch import \
@@ -16,7 +16,7 @@ from .widgets.QXPushButtonCSWSignal import QXPushButtonCSWSignal
 from .widgets.QSliderCSWNumber import QSliderCSWNumber
 
 class QLivePortraitAnimator(QBackendPanel):
-    def __init__(self, backend : LivePortraitAnimator, animatables_path : Path):
+    def __init__(self, backend : FasterLivePortraitAnimator, animatables_path : Path):
         self._animatables_path = animatables_path
 
         cs = backend.get_control_sheet()

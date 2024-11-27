@@ -13,19 +13,19 @@ from xlib.onnxruntime import (InferenceSession_with_device, ORTDeviceInfo,
 
 import os
 import sys
-repo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "repo")
+repo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "live_portrait")
 sys.path.append(repo_path)
 
-from .repo.src.config.argument_config import ArgumentConfig
-from .repo.src.config.inference_config import InferenceConfig
-from .repo.src.config.crop_config import CropConfig
-from .repo.src.live_portrait_wrapper import LivePortraitWrapperAnimal
-from .repo.src.utils.camera import get_rotation_matrix
-from .repo.src.utils.helper import calc_motion_multiplier
-from .repo.src.utils.cropper import Cropper
-from .repo.src.utils.io import resize_to_limit
-from .repo.src.utils.crop import prepare_paste_back, paste_back
-from .repo.src.utils.filter import smooth
+from .live_portrait.src.config.argument_config import ArgumentConfig
+from .live_portrait.src.config.inference_config import InferenceConfig
+from .live_portrait.src.config.crop_config import CropConfig
+from .live_portrait.src.live_portrait_wrapper import LivePortraitWrapperAnimal
+from .live_portrait.src.utils.camera import get_rotation_matrix
+from .live_portrait.src.utils.helper import calc_motion_multiplier
+from .live_portrait.src.utils.cropper import Cropper
+from .live_portrait.src.utils.io import resize_to_limit
+from .live_portrait.src.utils.crop import prepare_paste_back, paste_back
+from .live_portrait.src.utils.filter import smooth
 
 def partial_fields(target_class, kwargs):
     return target_class(**{k: v for k, v in kwargs.items() if hasattr(target_class, k)})
@@ -45,7 +45,10 @@ class LivePortrait:
     raises
      Exception
     """
-
+    @staticmethod
+    def paste_back(im_crop, M_c2o, img_ori, mask_ori):
+        return paste_back(im_crop, M_c2o, img_ori, mask_ori)
+    
     @staticmethod
     def get_available_devices() -> List[ORTDeviceInfo]:
         return get_available_devices_info()
@@ -91,7 +94,12 @@ class LivePortrait:
         self.motion_multiplier = None
         
         self.x_d_list = []
-
+        
+        # self.wait_batch_size = 10
+        # self.wait_queue = torch.zeros((self.wait_batch_size, 3, 512, 512), device=self.device)
+        # self.wait_count = 0
+        # self.out_queue = np.zeros((self.wait_batch_size, 3, 512, 512), np.float16)
+        # self.out_idx = 0
 
     def get_input_size(self):
         """
@@ -130,7 +138,7 @@ class LivePortrait:
                  rotation_cap_roll: float = 45,
                  do_crop: bool = True,
                  stitching: bool = False,
-                 pasteback: bool = True):
+                 pasteback: bool = True) -> tuple[np.ndarray, bool, np.ndarray, np.ndarray, np.ndarray] :
         """
 
         arguments
@@ -161,8 +169,10 @@ class LivePortrait:
         
         DRIVER_SIZE = (256, 256)
         SOURCE_SIZE = (256, 256)
+        flag_source_changed = False
         
         if self.x_s_info is None or not is_image:
+            flag_source_changed = True
             i_s_orig = resize_to_limit(img_source[:,:,:3], max_dim)
             if do_crop:
                 crop_info = self.cropper.crop_source_image(i_s_orig, self.cropper.crop_cfg)
@@ -307,12 +317,26 @@ class LivePortrait:
         # postprocessing
         t0 = time.perf_counter()
         
-        I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
+        # I_p = out['out']
+        # self.wait_queue[self.wait_count] = I_p
+        # self.wait_count += 1
+        # if self.wait_count == self.wait_batch_size:
+        #     self.out_queue = self.wait_queue.cpu().numpy()
+        #     self.wait_count = 0
+        
+        # I_p = self.out_queue[self.out_idx]
+        # self.out_idx = (self.out_idx + 1) % self.wait_batch_size
+        
+        # I_p = out['out'].cpu().numpy()
+        
+        I_p = out['out'][0].cpu().permute(1, 2, 0).numpy()
+        
+        # I_p = self.live_portrait_wrapper_animal.parse_output(out['out'])[0] # HWC
               
-        # paste back if flag pastback and do_crop and stitching
-        if pasteback and do_crop and stitching:
-            I_p_pstbk = paste_back(I_p, self.crop_info['M_c2o'], self.i_s_orig, self.mask_ori_float)
-            I_p = I_p_pstbk
+        # # paste back if flag pastback and do_crop and stitching
+        # if pasteback and do_crop and stitching:
+        #     I_p_pstbk = paste_back(I_p, self.crop_info['M_c2o'], self.i_s_orig, self.mask_ori_float)
+        #     I_p = I_p_pstbk
         
         t1 = time.perf_counter()
         self.t_post += t1 - t0
@@ -322,17 +346,6 @@ class LivePortrait:
             self.t_post = 0
             self.t_post_count = 0
         
-        # ip = ImageProcessor(img_source)
-        # dtype = ip.get_dtype()
-        # _,H,W,_ = ip.get_dims()
-
-        # out = self._generator.run(['out'], {'in_src': ip.resize(self.get_input_size()).ch(3).swap_ch().to_ufloat32(as_tanh=True).get_image('NCHW'),
-        #                                     'in_drv' : ImageProcessor(img_driver).resize(self.get_input_size()).ch(3).swap_ch().to_ufloat32(as_tanh=True).get_image('NCHW'),
-        #                                     'in_drv_start_motion' : driver_start_motion,
-        #                                     'in_power' : np.array([power], np.float32)
-        #                                     })[0].transpose(0,2,3,1)[0]
-
-        # out = ImageProcessor(out).to_dtype(dtype, from_tanh=True).resize((W,H)).swap_ch().get_image('HWC')
         
-        return I_p
+        return I_p, flag_source_changed, self.crop_info['M_c2o'], self.i_s_orig, self.mask_ori_float
 

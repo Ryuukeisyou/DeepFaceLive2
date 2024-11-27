@@ -868,6 +868,15 @@ class Localization:
                 'it-IT' : 'stitching',
                 'ja-JP' : 'stitching',
                 'de-DE' : 'stitching'},
+
+    'QLivePortraitPostprocess.module_title':{
+                'en-US' : 'LivePortrait postprocess',
+                'ru-RU' : 'LivePortrait postprocess',
+                'zh-CN' : 'LivePortrait postprocess',
+                'es-ES' : 'LivePortrait postprocess',
+                'it-IT' : 'LivePortrait postprocess',
+                'ja-JP' : 'LivePortrait postprocess',
+                'de-DE' : 'LivePortrait postprocess'},
     
     'QFaceSwapInsight.module_title':{
                 'en-US' : 'Face swap (Insight)',

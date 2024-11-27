@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-from modelhub.torch import LivePortrait
+from modelhub.torch import FasterLivePortrait
 from xlib import cv as lib_cv2
 from xlib import os as lib_os
 from xlib import path as lib_path
@@ -14,7 +14,7 @@ from .BackendBase import (BackendConnection, BackendDB, BackendHost,
                           BackendWorkerState)
 
 
-class LivePortraitAnimator(BackendHost):
+class FasterLivePortraitAnimator(BackendHost):
     def __init__(self, weak_heap : BackendWeakHeap, reemit_frame_signal : BackendSignal, bc_in : BackendConnection, bc_out : BackendConnection, animatables_path : Path, backend_db : BackendDB = None,
                   id : int = 0):
         self._id = id
@@ -42,7 +42,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
         self.pending_bcd = None
 
-        self.live_portrait_model : LivePortrait = None
+        self.faster_live_portrait : FasterLivePortrait = None
 
         self.animatable_img = None
 
@@ -66,7 +66,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         cs.reset_reference_pose.call_on_signal(self.on_cs_reset_reference_pose)
 
         cs.device.enable()
-        cs.device.set_choices( LivePortrait.get_available_devices(), none_choice_name='@misc.menu_select')
+        cs.device.set_choices( FasterLivePortrait.get_available_devices(), none_choice_name='@misc.menu_select')
         cs.device.select(state.device)
 
     def update_animatables(self):
@@ -77,7 +77,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
     def on_cs_device(self, idx, device):
         state, cs = self.get_state(), self.get_control_sheet()
         if device is not None and state.device == device:
-            self.live_portrait_model = LivePortrait(device)
+            self.faster_live_portrait = FasterLivePortrait(device, engine='trt', is_animal=True)
 
             cs.animatable.enable()
             self.update_animatables()
@@ -130,8 +130,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
         state.animatable = animatable
         self.animatable_img = None
-        self.live_portrait_model.clear_ref_motion_cache()
-        self.live_portrait_model.clear_source_cache()
+        self.faster_live_portrait.clear_ref_motion_cache()
+        self.faster_live_portrait.clear_source_cache()
 
         if animatable is not None:
             try:
@@ -208,7 +208,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_cs_stitching(self, stitching):
-        self.live_portrait_model.clear_source_cache()
+        self.faster_live_portrait.clear_source_cache()
         state, cs = self.get_state(), self.get_control_sheet()
         cs.stitching.set_flag(stitching)
         state.stitching = stitching
@@ -216,7 +216,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_cs_reset_reference_pose(self):
-        self.live_portrait_model.clear_ref_motion_cache()
+        self.faster_live_portrait.clear_ref_motion_cache()
         self.reemit_frame_signal.send()
 
     def on_tick(self):        
@@ -229,7 +229,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
             if bcd is not None:
                 bcd.assign_weak_heap(self.weak_heap)
 
-                lp_model = self.live_portrait_model
+                lp_model = self.faster_live_portrait
                 if lp_model is not None and self.animatable_img is not None:
 
                     for i, fsi in enumerate(bcd.get_face_swap_info_list()):
@@ -238,7 +238,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
                             
                             if crop_image is not None:
 
-                                anim_image, flag_source_changed, M_c2o, i_s_orig, mask_ori_float  = lp_model.generate(
+                                anim_image = lp_model.generate(
                                     self.animatable_img, 
                                     crop_image, 
                                     expression_multiplier=state.expression_multiplier,
@@ -251,20 +251,12 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     stitching=state.stitching)
                                 
                                 anim_image= ImageProcessor(anim_image).get_image('HWC')
-                                fsi.live_portrait_raw_out_name = f'{fsi.image_name}_lp_raw'
-                                bcd.set_image(fsi.live_portrait_raw_out_name, anim_image)
-                                
-                                bcd.set_file('lp_flag_source_changed', (1 if flag_source_changed else 0).to_bytes())
-                                bcd.set_file('lp_stitching', (1 if state.stitching else 0).to_bytes())
-                                if flag_source_changed and state.stitching:
-                                    bcd.set_file('lp_M_c2o', M_c2o.tobytes())
-                                    bcd.set_image('lp_i_s_orig', ImageProcessor(i_s_orig).get_image('HWC'))
-                                    bcd.set_file('lp_mask_ori_float', mask_ori_float.tobytes())
                            
                             else:
                                 anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
-                                fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
-                                bcd.set_image(fsi.face_swap_image_name, anim_image)
+                            
+                            fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
+                            bcd.set_image(fsi.face_swap_image_name, anim_image)
                                 
                             break
 
