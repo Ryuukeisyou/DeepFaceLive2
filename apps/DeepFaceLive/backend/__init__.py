@@ -5,8 +5,6 @@ from .CameraSource import CameraSource
 from .FaceAligner import FaceAligner
 from .FaceAnimator import FaceAnimator
 from .LivePortraitAnimator import LivePortraitAnimator
-from .FasterLivePortraitAnimator import FasterLivePortraitAnimator
-from .LivePortraitPostprocess import LivePortraitPostprocess
 from .FaceDetector import FaceDetector
 from .FaceCropper import FaceCropper
 from .FaceMarker import FaceMarker

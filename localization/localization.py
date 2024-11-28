@@ -797,6 +797,15 @@ class Localization:
                 'ja-JP' : 'LivePortraitアニメーター',
                 'de-DE' : 'Animatrice LivePortrait'},
 
+    'QLivePortraitAnimator.is_animal':{
+                'en-US' : 'animal',
+                'ru-RU' : 'animal',
+                'zh-CN' : 'animal',
+                'es-ES' : 'animal',
+                'it-IT' : 'animal',
+                'ja-JP' : 'animal',
+                'de-DE' : 'animal'},
+
     'QLivePortraitAnimator.driving_multiplier':{
                 'en-US' : 'driving multiplier',
                 'ru-RU' : 'driving multiplier',

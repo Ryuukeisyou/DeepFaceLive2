@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from modelhub.torch import LivePortrait
+from modelhub.torch import FasterLivePortrait
 from xlib import cv as lib_cv2
 from xlib import os as lib_os
 from xlib import path as lib_path
@@ -42,7 +43,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
         self.pending_bcd = None
 
-        self.live_portrait_model : LivePortrait = None
+        self.live_portrait : FasterLivePortrait = None
 
         self.animatable_img = None
 
@@ -51,6 +52,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         state, cs = self.get_state(), self.get_control_sheet()
 
         cs.device.call_on_selected(self.on_cs_device)
+        cs.is_animal.call_on_selected(self.on_cs_is_animal)
         cs.animatable.call_on_selected(self.on_cs_animatable)
 
         cs.animator_face_id.call_on_number(self.on_cs_animator_face_id)
@@ -66,8 +68,12 @@ class LivePortraitAnimatorWorker(BackendWorker):
         cs.reset_reference_pose.call_on_signal(self.on_cs_reset_reference_pose)
 
         cs.device.enable()
-        cs.device.set_choices( LivePortrait.get_available_devices(), none_choice_name='@misc.menu_select')
+        cs.device.set_choices( FasterLivePortrait.get_available_devices(), none_choice_name='@misc.menu_select')
         cs.device.select(state.device)
+        
+        cs.is_animal.enable()
+        cs.is_animal.set_choices([True, False], none_choice_name='@misc.menu_select')
+        cs.is_animal.select(state.is_animal)
 
     def update_animatables(self):
         state, cs = self.get_state(), self.get_control_sheet()
@@ -76,62 +82,126 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
     def on_cs_device(self, idx, device):
         state, cs = self.get_state(), self.get_control_sheet()
-        if device is not None and state.device == device:
-            self.live_portrait_model = LivePortrait(device)
-
-            cs.animatable.enable()
-            self.update_animatables()
-            cs.animatable.select(state.animatable)
-
-            cs.animator_face_id.enable()
-            cs.animator_face_id.set_config(lib_csw.Number.Config(min=0, max=16, step=1, decimals=0, allow_instant_update=True))
-            cs.animator_face_id.set_number(state.animator_face_id if state.animator_face_id is not None else 0)
-            
-            cs.expression_multiplier.enable()
-            cs.expression_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=4.0, step=0.01, decimals=2, allow_instant_update=True))
-            cs.expression_multiplier.set_number(state.expression_multiplier if state.expression_multiplier is not None else 1.0)
-
-            cs.rotation_multiplier.enable()
-            cs.rotation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
-            cs.rotation_multiplier.set_number(state.rotation_multiplier if state.rotation_multiplier is not None else 1.0)
-
-            cs.translation_multiplier.enable()
-            cs.translation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
-            cs.translation_multiplier.set_number(state.translation_multiplier if state.translation_multiplier is not None else 1.0)
-
-            cs.driving_multiplier.enable()
-            cs.driving_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
-            cs.driving_multiplier.set_number(state.driving_multiplier if state.driving_multiplier is not None else 1.0)
-
-            cs.rotation_cap_pitch.enable()
-            cs.rotation_cap_pitch.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
-            cs.rotation_cap_pitch.set_number(state.rotation_cap_pitch if state.rotation_cap_pitch is not None else 45)
-            
-            cs.rotation_cap_yaw.enable()
-            cs.rotation_cap_yaw.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
-            cs.rotation_cap_yaw.set_number(state.rotation_cap_yaw if state.rotation_cap_yaw is not None else 45)
-
-            cs.rotation_cap_roll.enable()
-            cs.rotation_cap_roll.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
-            cs.rotation_cap_roll.set_number(state.rotation_cap_roll if state.rotation_cap_roll is not None else 45)
-            
-            cs.stitching.enable()
-            cs.stitching.set_flag(state.stitching if state.stitching is not None else False)
-
-            cs.update_animatables.enable()
-            cs.reset_reference_pose.enable()
-        else:
+        if device is None:
+            self.terminate_flp(cs)
             state.device = device
-            self.save_state()
-            self.restart()
+            self.save_state()     
+        else:
+            if state.device == device:
+                if self.live_portrait is None and state.is_animal is not None:
+                    self.initialize_flp(state, cs)
+            else:
+                state.device = device
+                self.save_state()          
+                if self.live_portrait is None:
+                    if state.is_animal is not None:
+                        self.initialize_flp(state, cs)
+                    else:
+                        pass
+                else:
+                    self.terminate_flp(cs)
+                    self.initialize_flp(state, cs)
+    
+    def on_cs_is_animal(self, idx, is_animal):
+        state, cs = self.get_state(), self.get_control_sheet()
+        if is_animal is None:
+            self.terminate_flp(cs)
+            state.is_animal = is_animal
+            self.save_state()     
+        else:
+            if state.is_animal == is_animal:
+                if self.live_portrait is None and state.device is not None:
+                    self.initialize_flp(state, cs)
+            else:
+                state.is_animal = is_animal
+                self.save_state()          
+                if self.live_portrait is None:
+                    if state.device is not None:
+                        self.initialize_flp(state, cs)
+                    else:
+                        pass
+                else:
+                    self.terminate_flp(cs)
+                    self.initialize_flp(state, cs)
+       
+    def initialize_flp(self, state:'WorkerState', cs:'Sheet.Worker'):
+        self.live_portrait = FasterLivePortrait(device_info=state.device, engine='trt', is_animal=state.is_animal)
+        cs.animatable.enable()
+        self.update_animatables()
+        cs.animatable.select(state.animatable)
+
+        cs.animator_face_id.enable()
+        cs.animator_face_id.set_config(lib_csw.Number.Config(min=0, max=16, step=1, decimals=0, allow_instant_update=True))
+        cs.animator_face_id.set_number(state.animator_face_id if state.animator_face_id is not None else 0)
+        
+        cs.expression_multiplier.enable()
+        cs.expression_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=4.0, step=0.01, decimals=2, allow_instant_update=True))
+        cs.expression_multiplier.set_number(state.expression_multiplier if state.expression_multiplier is not None else 1.0)
+
+        cs.rotation_multiplier.enable()
+        cs.rotation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
+        cs.rotation_multiplier.set_number(state.rotation_multiplier if state.rotation_multiplier is not None else 1.0)
+
+        cs.translation_multiplier.enable()
+        cs.translation_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
+        cs.translation_multiplier.set_number(state.translation_multiplier if state.translation_multiplier is not None else 1.0)
+
+        cs.driving_multiplier.enable()
+        cs.driving_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
+        cs.driving_multiplier.set_number(state.driving_multiplier if state.driving_multiplier is not None else 1.0)
+
+        cs.rotation_cap_pitch.enable()
+        cs.rotation_cap_pitch.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
+        cs.rotation_cap_pitch.set_number(state.rotation_cap_pitch if state.rotation_cap_pitch is not None else 45)
+        
+        cs.rotation_cap_yaw.enable()
+        cs.rotation_cap_yaw.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
+        cs.rotation_cap_yaw.set_number(state.rotation_cap_yaw if state.rotation_cap_yaw is not None else 45)
+
+        cs.rotation_cap_roll.enable()
+        cs.rotation_cap_roll.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
+        cs.rotation_cap_roll.set_number(state.rotation_cap_roll if state.rotation_cap_roll is not None else 45)
+        
+        cs.stitching.enable()
+        cs.stitching.set_flag(state.stitching if state.stitching is not None else False)
+
+        cs.update_animatables.enable()
+        cs.reset_reference_pose.enable()
+
+    def terminate_flp(self, cs:'Sheet.Worker'):
+        self.live_portrait = None
+        
+        cs.animatable.disable()
+
+        cs.animator_face_id.disable()
+        
+        cs.expression_multiplier.disable()
+
+        cs.rotation_multiplier.disable()
+
+        cs.translation_multiplier.disable()
+
+        cs.driving_multiplier.disable()
+
+        cs.rotation_cap_pitch.disable()
+        
+        cs.rotation_cap_yaw.disable()
+
+        cs.rotation_cap_roll.disable()
+        
+        cs.stitching.disable()
+
+        cs.update_animatables.disable()
+
+        cs.reset_reference_pose.disable()
 
     def on_cs_animatable(self, idx, animatable):
         state, cs = self.get_state(), self.get_control_sheet()
 
         state.animatable = animatable
         self.animatable_img = None
-        self.live_portrait_model.clear_ref_motion_cache()
-        self.live_portrait_model.clear_source_cache()
+        self.live_portrait.clear_ref_motion_cache()
+        self.live_portrait.clear_source_cache()
 
         if animatable is not None:
             try:
@@ -208,7 +278,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_cs_stitching(self, stitching):
-        self.live_portrait_model.clear_source_cache()
+        self.live_portrait.clear_source_cache()
         state, cs = self.get_state(), self.get_control_sheet()
         cs.stitching.set_flag(stitching)
         state.stitching = stitching
@@ -216,7 +286,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.reemit_frame_signal.send()
 
     def on_cs_reset_reference_pose(self):
-        self.live_portrait_model.clear_ref_motion_cache()
+        self.live_portrait.clear_ref_motion_cache()
         self.reemit_frame_signal.send()
 
     def on_tick(self):        
@@ -229,8 +299,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
             if bcd is not None:
                 bcd.assign_weak_heap(self.weak_heap)
 
-                lp_model = self.live_portrait_model
-                if lp_model is not None and self.animatable_img is not None:
+                lp = self.live_portrait
+                if lp is not None and self.animatable_img is not None:
 
                     for i, fsi in enumerate(bcd.get_face_swap_info_list()):
                         if fsi.face_urect is not None and state.animator_face_id == i:
@@ -238,7 +308,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
                             
                             if crop_image is not None:
 
-                                anim_image, flag_source_changed, M_c2o, i_s_orig, mask_ori_float  = lp_model.generate(
+                                anim_image = lp.generate(
                                     self.animatable_img, 
                                     crop_image, 
                                     expression_multiplier=state.expression_multiplier,
@@ -249,20 +319,13 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     rotation_cap_yaw=state.rotation_cap_yaw,
                                     rotation_cap_roll=state.rotation_cap_roll,
                                     stitching=state.stitching)
-                                
-                                anim_image= ImageProcessor(anim_image).get_image('HWC')
-                                fsi.live_portrait_raw_out_name = f'{fsi.image_name}_lp_raw'
-                                bcd.set_image(fsi.live_portrait_raw_out_name, anim_image)
-                                
-                                bcd.set_file('lp_flag_source_changed', (1 if flag_source_changed else 0).to_bytes())
-                                bcd.set_file('lp_stitching', (1 if state.stitching else 0).to_bytes())
-                                if flag_source_changed and state.stitching:
-                                    bcd.set_file('lp_M_c2o', M_c2o.tobytes())
-                                    bcd.set_image('lp_i_s_orig', ImageProcessor(i_s_orig).get_image('HWC'))
-                                    bcd.set_file('lp_mask_ori_float', mask_ori_float.tobytes())
+                                if anim_image is not None:
+                                    anim_image = ImageProcessor(anim_image).get_image('HWC')
                            
                             else:
                                 anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
+                            
+                            if anim_image is not None:
                                 fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
                                 bcd.set_image(fsi.face_swap_image_name, anim_image)
                                 
@@ -283,6 +346,7 @@ class Sheet:
         def __init__(self):
             super().__init__()
             self.device = lib_csw.DynamicSingleSwitch.Client()
+            self.is_animal = lib_csw.DynamicSingleSwitch.Client()
             self.animatable = lib_csw.DynamicSingleSwitch.Client()
             self.animator_face_id = lib_csw.Number.Client()
             self.update_animatables = lib_csw.Signal.Client()
@@ -300,6 +364,7 @@ class Sheet:
         def __init__(self):
             super().__init__()
             self.device = lib_csw.DynamicSingleSwitch.Host()
+            self.is_animal = lib_csw.DynamicSingleSwitch.Host()
             self.animatable = lib_csw.DynamicSingleSwitch.Host()
             self.animator_face_id = lib_csw.Number.Host()
             self.update_animatables = lib_csw.Signal.Host()
@@ -315,6 +380,7 @@ class Sheet:
 
 class WorkerState(BackendWorkerState):
     device = None
+    is_animal : bool = None
     animatable : str = None
     animator_face_id : int = None
     expression_multiplier : float = None

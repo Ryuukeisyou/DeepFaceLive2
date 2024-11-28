@@ -4,7 +4,7 @@ from localization import L
 from resources.gfx import QXImageDB
 from xlib import qt as qtx
 
-from ..backend import FasterLivePortraitAnimator
+from ..backend import LivePortraitAnimator
 from .widgets.QBackendPanel import QBackendPanel
 from .widgets.QCheckBoxCSWFlag import QCheckBoxCSWFlag
 from .widgets.QComboBoxCSWDynamicSingleSwitch import \
@@ -16,7 +16,7 @@ from .widgets.QXPushButtonCSWSignal import QXPushButtonCSWSignal
 from .widgets.QSliderCSWNumber import QSliderCSWNumber
 
 class QLivePortraitAnimator(QBackendPanel):
-    def __init__(self, backend : FasterLivePortraitAnimator, animatables_path : Path):
+    def __init__(self, backend : LivePortraitAnimator, animatables_path : Path):
         self._animatables_path = animatables_path
 
         cs = backend.get_control_sheet()
@@ -25,6 +25,9 @@ class QLivePortraitAnimator(QBackendPanel):
 
         q_device_label  = QLabelPopupInfo(label=L('@common.device'), popup_info_text=L('@common.help.device') )
         q_device        = QComboBoxCSWDynamicSingleSwitch(cs.device, reflect_state_widgets=[q_device_label])
+
+        q_is_animal_label  = QLabelPopupInfo(label=L('@QLivePortraitAnimator.is_animal'))
+        q_is_animal        = QComboBoxCSWDynamicSingleSwitch(cs.is_animal, reflect_state_widgets=[q_is_animal_label])
 
         q_animatable_label = QLabelPopupInfo(label=L('@QFaceAnimator.animatable') )
         q_animatable       = QComboBoxCSWDynamicSingleSwitch(cs.animatable, reflect_state_widgets=[q_animatable_label, btn_open_folder])
@@ -62,6 +65,9 @@ class QLivePortraitAnimator(QBackendPanel):
         row = 0
         grid_l.addWidget(q_device_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addWidget(q_device, row, 1, alignment=qtx.AlignLeft )
+        row += 1
+        grid_l.addWidget(q_is_animal_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
+        grid_l.addWidget(q_is_animal, row, 1, alignment=qtx.AlignLeft )
         row += 1
         grid_l.addWidget(q_animatable_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addLayout(qtx.QXHBoxLayout([q_animatable, 2, btn_open_folder, 2, q_update_animatables]), row, 1 )
