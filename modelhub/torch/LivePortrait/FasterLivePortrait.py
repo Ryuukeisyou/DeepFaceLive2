@@ -91,6 +91,82 @@ class FasterLivePortrait:
     def clear_ref_motion_cache(self):
         self.pipe.R_d_0 = None
 
+    def calc_fe(self, 
+                x_d_i_diff : Tensor, 
+                rotate_pitch = 0, 
+                rotate_yaw = 0,
+                rotate_roll = 0,
+                eyes = 1, 
+                eyebrow = 1, 
+                wink = 1, 
+                pupil_x = 1, 
+                pupil_y = 1, 
+                mouth = 1, 
+                eee = 1, 
+                woo = 1, 
+                smile = 1):
+
+        x_d_i_diff[0, 20, 1] *= smile
+        x_d_i_diff[0, 14, 1] *= smile
+        x_d_i_diff[0, 17, 1] *= smile
+        x_d_i_diff[0, 17, 2] *= smile
+        x_d_i_diff[0, 13, 1] *= smile
+        x_d_i_diff[0, 16, 1] *= smile
+        x_d_i_diff[0, 3, 1] *= smile
+        x_d_i_diff[0, 7, 1] *= smile
+
+        x_d_i_diff[0, 19, 1] *= mouth
+        x_d_i_diff[0, 19, 2] *= mouth
+        x_d_i_diff[0, 17, 1] *= mouth
+        rotate_pitch -= mouth * 0.05
+
+        x_d_i_diff[0, 20, 2] *= eee
+        x_d_i_diff[0, 20, 1] *= eee
+        #x_d_new[0, 19, 1] *= eee
+        x_d_i_diff[0, 14, 1] *= eee
+
+        x_d_i_diff[0, 14, 1] *= woo
+        x_d_i_diff[0, 3, 1] *= woo
+        x_d_i_diff[0, 7, 1] *= woo
+        x_d_i_diff[0, 17, 2] *= woo
+
+        x_d_i_diff[0, 11, 1] *= wink
+        x_d_i_diff[0, 13, 1] *= wink
+        x_d_i_diff[0, 17, 0] *= wink
+        x_d_i_diff[0, 17, 1] *= wink
+        x_d_i_diff[0, 3, 1] *= wink
+        rotate_roll -= wink * 0.1
+        rotate_yaw -= wink * 0.1
+
+        if 0 < pupil_x:
+            x_d_i_diff[0, 11, 0] *= pupil_x
+            x_d_i_diff[0, 15, 0] *= pupil_x
+        else:
+            x_d_i_diff[0, 11, 0] *= pupil_x
+            x_d_i_diff[0, 15, 0] *= pupil_x
+
+        x_d_i_diff[0, 11, 1] *= pupil_y
+        x_d_i_diff[0, 15, 1] *= pupil_y
+        eyes -= pupil_y / 2.
+
+        x_d_i_diff[0, 11, 1] *= eyes
+        x_d_i_diff[0, 13, 1] *= eyes
+        x_d_i_diff[0, 15, 1] *= eyes
+        x_d_i_diff[0, 16, 1] *= eyes
+        x_d_i_diff[0, 1, 1] *= eyes
+        x_d_i_diff[0, 2, 1] *= eyes
+
+        if 0 < eyebrow:
+            x_d_i_diff[0, 1, 1] *= eyebrow
+            x_d_i_diff[0, 2, 1] *= eyebrow
+        else:
+            x_d_i_diff[0, 1, 0] *= eyebrow
+            x_d_i_diff[0, 2, 0] *= eyebrow
+            x_d_i_diff[0, 1, 1] *= eyebrow
+            x_d_i_diff[0, 2, 1] *= eyebrow
+
+        return rotate_pitch, rotate_yaw, rotate_roll
+
     def cap_value(self, value:np.ndarray, cap:float, max:float, threshold:float = 0.8):
         if (np.abs(value) < cap * threshold):
             return value
@@ -219,6 +295,7 @@ class FasterLivePortrait:
                  img_driver : np.ndarray, 
                  is_source_video: bool = False,
                  max_dim: int = 720,
+                 src_scale: float = 2.6,
                  expression_multiplier: float = 1.5,
                  rotation_multiplier: float = 1,
                  translation_multiplier: float = 1,
@@ -260,6 +337,7 @@ class FasterLivePortrait:
         
         # set params
         pipe.is_source_video = is_source_video
+        pipe.cfg.crop_params.src_scale = src_scale
         pipe.cfg.infer_params.source_max_dim = max_dim
         pipe.cfg.infer_params.flag_do_crop = do_crop
         pipe.cfg.infer_params.flag_stitching = stitching
@@ -401,7 +479,9 @@ class FasterLivePortrait:
             if pipe.cfg.infer_params.flag_stitching:
                 x_d_i_new = pipe.stitching(x_s, x_d_i_new)
 
-        x_d_i_new = x_s + (x_d_i_new - x_s) * pipe.cfg.infer_params.driving_multiplier
+        x_d_i_diff = x_d_i_new - x_s
+        self.calc_fe(x_d_i_diff, eyes=2, pupil_x=1.1, pupil_y=1.1)
+        x_d_i_new = x_s + x_d_i_diff * pipe.cfg.infer_params.driving_multiplier
         out_crop = pipe.model_dict["warping_spade"].predict(f_s, x_s, x_d_i_new)
         if pipe.cfg.infer_params.flag_pasteback and pipe.cfg.infer_params.flag_do_crop and pipe.cfg.infer_params.flag_stitching:
             # TODO: pasteback is slow, considering optimize it using multi-threading or GPU
