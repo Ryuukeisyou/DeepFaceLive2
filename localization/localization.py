@@ -815,6 +815,15 @@ class Localization:
                 'ja-JP' : 'driving multiplier',
                 'de-DE' : 'driving multiplier'},
 
+    'QLivePortraitAnimator.retarget_eye':{
+                'en-US' : 'retarget eye',
+                'ru-RU' : 'retarget eye',
+                'zh-CN' : 'retarget eye',
+                'es-ES' : 'retarget eye',
+                'it-IT' : 'retarget eye',
+                'ja-JP' : 'retarget eye',
+                'de-DE' : 'retarget eye'},
+
     'QLivePortraitAnimator.expression_multiplier':{
                 'en-US' : 'expression multiplier',
                 'ru-RU' : 'expression multiplier',

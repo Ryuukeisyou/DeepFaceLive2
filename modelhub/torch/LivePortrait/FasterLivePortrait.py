@@ -147,14 +147,14 @@ class FasterLivePortrait:
 
         x_d_i_diff[0, 11, 1] *= pupil_y
         x_d_i_diff[0, 15, 1] *= pupil_y
-        eyes -= pupil_y / 2.
+        # eyes -= pupil_y / 2.
 
-        x_d_i_diff[0, 11, 1] *= eyes
-        x_d_i_diff[0, 13, 1] *= eyes
-        x_d_i_diff[0, 15, 1] *= eyes
-        x_d_i_diff[0, 16, 1] *= eyes
-        x_d_i_diff[0, 1, 1] *= eyes
-        x_d_i_diff[0, 2, 1] *= eyes
+        x_d_i_diff[0, 11, 1] *= eyes * 1
+        x_d_i_diff[0, 13, 1] *= eyes * 1
+        x_d_i_diff[0, 15, 1] *= eyes * 1
+        x_d_i_diff[0, 16, 1] *= eyes * 1
+        x_d_i_diff[0, 1, 1] *= eyes * 1
+        x_d_i_diff[0, 2, 1] *= eyes * 1
 
         if 0 < eyebrow:
             x_d_i_diff[0, 1, 1] *= eyebrow
@@ -300,6 +300,7 @@ class FasterLivePortrait:
                  rotation_multiplier: float = 1,
                  translation_multiplier: float = 1,
                  driving_multiplier: float = 1.75,
+                 retarget_eye: float = 1,
                  rotation_cap_pitch: float = 45,
                  rotation_cap_yaw: float = 45,
                  rotation_cap_roll: float = 45,
@@ -480,7 +481,7 @@ class FasterLivePortrait:
                 x_d_i_new = pipe.stitching(x_s, x_d_i_new)
 
         x_d_i_diff = x_d_i_new - x_s
-        self.calc_fe(x_d_i_diff, eyes=2, pupil_x=1.1, pupil_y=1.1)
+        self.calc_fe(x_d_i_diff, eyes=retarget_eye, pupil_x=1.1, pupil_y=1.1)
         x_d_i_new = x_s + x_d_i_diff * pipe.cfg.infer_params.driving_multiplier
         out_crop = pipe.model_dict["warping_spade"].predict(f_s, x_s, x_d_i_new)
         if pipe.cfg.infer_params.flag_pasteback and pipe.cfg.infer_params.flag_do_crop and pipe.cfg.infer_params.flag_stitching:

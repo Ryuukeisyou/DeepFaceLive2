@@ -60,6 +60,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
         cs.rotation_multiplier.call_on_number(self.on_cs_rotation_multiplier)
         cs.translation_multiplier.call_on_number(self.on_cs_translation_multiplier)
         cs.driving_multiplier.call_on_number(self.on_cs_driving_multiplier)
+        cs.retarget_eye.call_on_number(self.on_cs_retarget_eye)
         cs.rotation_cap_pitch.call_on_number(self.on_cs_rotation_cap_pitch)
         cs.rotation_cap_yaw.call_on_number(self.on_cs_rotation_cap_yaw)
         cs.rotation_cap_roll.call_on_number(self.on_cs_rotation_cap_roll)
@@ -149,6 +150,10 @@ class LivePortraitAnimatorWorker(BackendWorker):
         cs.driving_multiplier.enable()
         cs.driving_multiplier.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.01, decimals=2, allow_instant_update=True))
         cs.driving_multiplier.set_number(state.driving_multiplier if state.driving_multiplier is not None else 1.0)
+
+        cs.retarget_eye.enable()
+        cs.retarget_eye.set_config(lib_csw.Number.Config(min=0.0, max=2.0, step=0.05, decimals=2, allow_instant_update=True))
+        cs.retarget_eye.set_number(state.retarget_eye if state.retarget_eye is not None else 1.0)
 
         cs.rotation_cap_pitch.enable()
         cs.rotation_cap_pitch.set_config(lib_csw.Number.Config(min=0.0, max=90, step=1, decimals=2, allow_instant_update=True))
@@ -253,6 +258,14 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.save_state()
         self.reemit_frame_signal.send()
 
+    def on_cs_retarget_eye(self, retarget_eye):
+        state, cs = self.get_state(), self.get_control_sheet()
+        cfg = cs.retarget_eye.get_config()
+        retarget_eye = state.retarget_eye = float(np.clip(retarget_eye, cfg.min, cfg.max))
+        cs.retarget_eye.set_number(retarget_eye)
+        self.save_state()
+        self.reemit_frame_signal.send()
+
     def on_cs_rotation_cap_pitch(self, rotation_cap_pitch):
         state, cs = self.get_state(), self.get_control_sheet()
         cfg = cs.rotation_cap_pitch.get_config()
@@ -315,6 +328,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     rotation_multiplier=state.rotation_multiplier,
                                     translation_multiplier=state.translation_multiplier,
                                     driving_multiplier=state.driving_multiplier, 
+                                    retarget_eye=state.retarget_eye,
                                     rotation_cap_pitch=state.rotation_cap_pitch,
                                     rotation_cap_yaw=state.rotation_cap_yaw,
                                     rotation_cap_roll=state.rotation_cap_roll,
@@ -355,6 +369,7 @@ class Sheet:
             self.rotation_multiplier = lib_csw.Number.Client()
             self.translation_multiplier = lib_csw.Number.Client()
             self.driving_multiplier = lib_csw.Number.Client()
+            self.retarget_eye = lib_csw.Number.Client()
             self.rotation_cap_pitch = lib_csw.Number.Client()
             self.rotation_cap_yaw= lib_csw.Number.Client()
             self.rotation_cap_roll = lib_csw.Number.Client()
@@ -373,6 +388,7 @@ class Sheet:
             self.rotation_multiplier = lib_csw.Number.Host()
             self.translation_multiplier = lib_csw.Number.Host()
             self.driving_multiplier = lib_csw.Number.Host()
+            self.retarget_eye = lib_csw.Number.Host()
             self.rotation_cap_pitch = lib_csw.Number.Host()
             self.rotation_cap_yaw = lib_csw.Number.Host()
             self.rotation_cap_roll = lib_csw.Number.Host()
@@ -387,6 +403,7 @@ class WorkerState(BackendWorkerState):
     rotation_multiplier : float = None
     translation_multiplier: float = None
     driving_multiplier : float = None
+    retarget_eye : float = None
     rotation_cap_pitch: float = None
     rotation_cap_yaw: float = None
     rotation_cap_roll: float = None

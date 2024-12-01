@@ -55,7 +55,10 @@ class QLivePortraitAnimator(QBackendPanel):
 
         q_driving_multiplier_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.driving_multiplier') )
         q_driving_multiplier = QSliderCSWNumber(cs.driving_multiplier, reflect_state_widgets=[q_driving_multiplier_label])
-        
+
+        q_retarget_eye_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.retarget_eye') )
+        q_retarget_eye = QSpinBoxCSWNumber(cs.retarget_eye, reflect_state_widgets=[q_retarget_eye_label])
+
         q_stitching_label = QLabelPopupInfo(label=L('@QLivePortraitAnimator.stitching') )
         q_stitching = QCheckBoxCSWFlag(cs.stitching, reflect_state_widgets=q_stitching_label)
         
@@ -95,6 +98,9 @@ class QLivePortraitAnimator(QBackendPanel):
         row += 1
         grid_l.addWidget(q_driving_multiplier_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addWidget(q_driving_multiplier, row, 1 )
+        row += 1
+        grid_l.addWidget(q_retarget_eye_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
+        grid_l.addWidget(q_retarget_eye, row, 1 )
         row += 1
         grid_l.addWidget(q_stitching_label, row, 0, alignment=qtx.AlignRight | qtx.AlignVCenter  )
         grid_l.addWidget(q_stitching, row, 1 )
