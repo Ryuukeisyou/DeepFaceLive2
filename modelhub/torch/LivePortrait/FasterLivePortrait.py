@@ -2,6 +2,7 @@ from pathlib import Path
 import time
 from typing import List
 
+import tqdm
 import copy
 import cv2
 from PIL import Image
@@ -72,18 +73,8 @@ class FasterLivePortrait:
         
         cfg = OmegaConf.load(cfg_path)
         self.pipe = FasterLivePortraitPipeline(cfg=cfg, is_animal=is_animal, device=self.device_id)
-        self.is_source_video = False      
         
-        self.t_pre = 0
-        self.t_drive = 0
-        self.t_kalman = 0
-        self.t_warp_decode = 0
-        self.t_post = 0
-        self.t_pre_count = 0
-        self.t_drive_count = 0
-        self.t_kalman_count = 0
-        self.t_warp_decode_count = 0
-        self.t_post_count = 0
+        self.source_idx = 0    
     
     def clear_source_cache(self):
         self.pipe.src_infos.clear()
@@ -178,9 +169,8 @@ class FasterLivePortrait:
             else:
                 return (-threshold * cap - (-cap)) / (-threshold * cap - (-max)) * (value - (-max)) + (-cap)       
     
-    def prepare_source(self, img_rgb):
+    def prepare_source(self, img_rgb) -> list:
         pipe = self.pipe
-        pipe.src_infos = []
         
         lmk = None
         if pipe.is_animal:
@@ -288,11 +278,19 @@ class FasterLivePortrait:
         img_source_t = torch.from_numpy(img_rgb).to(pipe.device).float()
         src_info.append(img_source_t)
         
-        pipe.src_infos.append(src_info)
+        return src_info
+    
+    def mirror_idx(self, idx, length) -> int:
+        mod = idx % (length * 2)
+        if mod < length:
+            return mod
+        else:
+            return length * 2 - mod - 1
+        
         
     def generate(self, 
-                 img_source : np.ndarray, 
-                 img_driver : np.ndarray, 
+                 img_source : np.ndarray | cv2.VideoCapture, 
+                 img_driver : np.ndarray,
                  is_source_video: bool = False,
                  max_dim: int = 720,
                  src_scale: float = 2.6,
@@ -337,7 +335,6 @@ class FasterLivePortrait:
         pipe = self.pipe
         
         # set params
-        pipe.is_source_video = is_source_video
         pipe.cfg.crop_params.src_scale = src_scale
         pipe.cfg.infer_params.source_max_dim = max_dim
         pipe.cfg.infer_params.flag_do_crop = do_crop
@@ -345,6 +342,37 @@ class FasterLivePortrait:
         pipe.cfg.infer_params.flag_pasteback = pasteback
         pipe.cfg.infer_params.driving_multiplier = driving_multiplier
         
+        # prepare source if not exist
+        if len(pipe.src_infos) == 0:
+            if isinstance(img_source, cv2.VideoCapture):
+                pipe.is_source_video = True
+                frames = []
+                vid_cap = img_source
+                vid_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                while True:
+                    ret, frame = vid_cap.read()
+                    if not ret:
+                        break
+                    # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frames.append(frame)
+                for frame in tqdm.tqdm(frames):
+                    src_info = self.prepare_source(frame)
+                    pipe.src_infos.append(src_info)
+            elif isinstance(img_source, np.ndarray):
+                pipe.is_source_video = False
+                src_info = self.prepare_source(img_source[:,:,:3])
+                pipe.src_infos = [src_info]
+            else:
+                raise ValueError("img_source not valid")
+        
+        # load src_info           
+        if pipe.is_source_video:
+            using_source_idx = self.mirror_idx(self.source_idx, len(pipe.src_infos))
+            self.source_idx += 1
+        else:
+            using_source_idx = 0
+        x_s_info, source_lmk, R_s, f_s, x_s, x_c_s, lip_delta_before_animation, flag_lip_zero, mask_ori_float, M, img_source_t = pipe.src_infos[using_source_idx]            
+            
         img_rgb = img_driver
         if pipe.src_lmk_pre is None:
             img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
@@ -398,13 +426,9 @@ class FasterLivePortrait:
             pipe.exp_smooth = utils.OneEuroFilter(4, 1)
         R_d_0 = pipe.R_d_0.copy()
         x_d_0_info = copy.deepcopy(pipe.x_d_0_info)
-        out_crop, out_org = None, None
+        out_crop, out_org = None, None    
+
         
-        # prepare source if not exist
-        if len(pipe.src_infos) == 0:
-            self.prepare_source(img_source[:,:,:3])
-        
-        x_s_info, source_lmk, R_s, f_s, x_s, x_c_s, lip_delta_before_animation, flag_lip_zero, mask_ori_float, M, img_source_t = pipe.src_infos[0]
         if pipe.cfg.infer_params.flag_relative_motion:
             if pipe.is_source_video:
                 if pipe.cfg.infer_params.flag_video_editing_head_rotation:

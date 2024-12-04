@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 
+import cv2
 import numpy as np
 from modelhub.torch import LivePortrait
 from modelhub.torch import FasterLivePortrait
@@ -78,7 +79,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
 
     def update_animatables(self):
         state, cs = self.get_state(), self.get_control_sheet()
-        cs.animatable.set_choices([animatable_path.name for animatable_path in lib_path.get_files_paths(self.animatables_path, extensions=['.jpg','.jpeg','.png'])], none_choice_name='@misc.menu_select')
+        cs.animatable.set_choices([animatable_path.name for animatable_path in lib_path.get_files_paths(self.animatables_path, extensions=['.jpg','.jpeg','.png', '.mp4'])], none_choice_name='@misc.menu_select')
 
 
     def on_cs_device(self, idx, device):
@@ -208,12 +209,20 @@ class LivePortraitAnimatorWorker(BackendWorker):
         self.live_portrait.clear_ref_motion_cache()
         self.live_portrait.clear_source_cache()
 
-        if animatable is not None:
-            try:
-                ip = ImageProcessor(lib_cv2.imread(self.animatables_path / animatable))
-                self.animatable_img = ip.get_image('HWC')
-            except Exception as e:
-                cs.animatable.unselect()
+        if animatable is not None and isinstance(animatable, str):
+            if animatable.endswith('mp4'):
+                try:
+                    self.animatable_img = cv2.VideoCapture(self.animatables_path / animatable)
+                except Exception as e:
+                    print(e)
+                    cs.animatable.unselect()
+            else:
+                try:
+                    ip = ImageProcessor(lib_cv2.imread(self.animatables_path / animatable))
+                    self.animatable_img = ip.get_image('HWC')
+                except Exception as e:
+                    print(e)
+                    cs.animatable.unselect()
 
         self.save_state()
         self.reemit_frame_signal.send()
@@ -319,6 +328,7 @@ class LivePortraitAnimatorWorker(BackendWorker):
                         if fsi.face_urect is not None and state.animator_face_id == i:
                             crop_image = bcd.get_image(fsi.face_crop_image_name)
                             
+                            anim_image = None
                             if crop_image is not None:
 
                                 anim_image = lp.generate(
@@ -337,7 +347,8 @@ class LivePortraitAnimatorWorker(BackendWorker):
                                     anim_image = ImageProcessor(anim_image).get_image('HWC')
                            
                             else:
-                                anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
+                                if isinstance(self.animatable_img, np.ndarray):
+                                    anim_image = ImageProcessor(self.animatable_img).get_image('HWC')
                             
                             if anim_image is not None:
                                 fsi.face_swap_image_name = f'{fsi.image_name}_swapped'
