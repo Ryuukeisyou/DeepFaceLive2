@@ -1,3 +1,6 @@
+This is a fork to combine <a href="https://github.com/warmshao/FasterLivePortrait">FaterLivePortrait</a> into DeepFaceLive.
+
+
 <table align="center" border="0">
 
 <tr><td colspan=2 align="center">
